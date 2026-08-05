@@ -2244,9 +2244,10 @@ import terrainMtn2 from './terrain-mountains2.js';
             treeMeshes.forEach((instMesh, meshIdx) => {
             const count = instMesh.maxCount || instMesh.count;
             let treeUpdated = false;
-            // Update 1/15th of trees per frame — fast enough to keep the horizon
-            // populated at flight speed without the CPU cost of a full 1/10th pass
-            for (let i = currentFrame % 15; i < count; i += 15) {
+            // Update 1/30th of trees per frame to keep noise-sampling cost low on
+            // mobile. Timing no longer matters for pop-in: the far-ring spawn below
+            // places respawns at the fog edge regardless of how late they fire.
+            for (let i = currentFrame % 30; i < count; i += 30) {
                 instMesh.getMatrixAt(i, dummy.matrix);
                 dummy.position.setFromMatrixPosition(dummy.matrix);
                 

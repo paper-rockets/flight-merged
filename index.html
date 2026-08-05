@@ -783,19 +783,11 @@ import terrainMtn2 from './terrain-mountains2.js';
     geoCrystal.scale(1, 3, 1);
     geoCrystal.computeVertexNormals();
 
-    const matCrystal = new THREE.MeshPhysicalMaterial({
+    const matCrystal = new THREE.MeshStandardMaterial({
         roughness: 0.08,
         metalness: 0.15,
         transparent: true,
         opacity: 0.82,
-        transmission: 0.3,
-        thickness: 2.0,
-        ior: 2.2,
-        clearcoat: 1.0,
-        clearcoatRoughness: 0.05,
-        sheen: 1.0,
-        sheenRoughness: 0.3,
-        sheenColor: new THREE.Color(0xffffff),
         envMapIntensity: 1.5,
         depthWrite: true,
         depthTest: true,
@@ -804,7 +796,7 @@ import terrainMtn2 from './terrain-mountains2.js';
 
     matCrystal.onBeforeCompile = (shader) => {
         shader.uniforms.crystalGlow = { value: 0.0 };
-        shader.uniforms.baseGlow = { value: 1.2 };
+        shader.uniforms.baseGlow = { value: 2.5 };
         shader.uniforms.nightGlowMult = { value: 1.5 };
         shader.uniforms.uCustomColors = { value: [
             new THREE.Color('#6a00ff'), new THREE.Color('#ff0066'),
@@ -909,8 +901,13 @@ import terrainMtn2 from './terrain-mountains2.js';
         ).replace(
             '#include <emissivemap_fragment>',
             `#include <emissivemap_fragment>
-             float innerGlow = fresnel * 0.4 + 0.15;
-             totalEmissiveRadiance += diffuseColor.rgb * (baseGlow * innerGlow + crystalGlow * nightGlowMult);
+             // Inner glow — brighter at edges, staggered pulse per crystal using world position
+             float innerGlow = fresnel * 0.9 + 0.35;
+             float pulse = sin(uTime * 1.4 + vWorldPosC.x * 0.008 + vWorldPosC.z * 0.008) * 0.18 + 0.82;
+             // Extra saturation on emissive so it reads as vivid neon
+             float lumaC = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
+             vec3 vividGlow = clamp(mix(vec3(lumaC), diffuseColor.rgb, 3.5), 0.0, 1.0);
+             totalEmissiveRadiance += vividGlow * (baseGlow * innerGlow * pulse + crystalGlow * nightGlowMult) + vec3(1.0) * fresnel * 0.15;
             `
         );
     };

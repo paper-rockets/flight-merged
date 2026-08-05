@@ -2244,8 +2244,9 @@ import terrainMtn2 from './terrain-mountains2.js';
             treeMeshes.forEach((instMesh, meshIdx) => {
             const count = instMesh.maxCount || instMesh.count;
             let treeUpdated = false;
-            // Update 1/30th of trees per frame instead of 1/10th to save massive CPU overhead
-            for (let i = currentFrame % 30; i < count; i += 30) {
+            // Update 1/15th of trees per frame — fast enough to keep the horizon
+            // populated at flight speed without the CPU cost of a full 1/10th pass
+            for (let i = currentFrame % 15; i < count; i += 15) {
                 instMesh.getMatrixAt(i, dummy.matrix);
                 dummy.position.setFromMatrixPosition(dummy.matrix);
                 
@@ -2259,9 +2260,18 @@ import terrainMtn2 from './terrain-mountains2.js';
                     let nx, nz, h, pathVal, cellKey;
                     let attempts = 0;
 
+                    // Forward heading on the XZ plane: base dir is (0,0,-1) rotated by
+                    // yaw, so the travel direction angle is (playerYaw + PI).
+                    const fwdAng = playerYaw + Math.PI;
+
                     while(!valid && attempts < 15) {
-                        nx = playerX + (Math.random() - 0.5) * treeDist * 2.0;
-                        nz = playerZ + (Math.random() - 0.5) * treeDist * 2.0;
+                        // Spawn in the forward hemisphere at the far ring (0.6–1.0 of
+                        // treeDist) so new trees appear at/near the fog edge and stream
+                        // in gradually, instead of popping into clear view up close.
+                        const spawnR = treeDist * (0.6 + Math.random() * 0.4);
+                        const ang = fwdAng + (Math.random() - 0.5) * Math.PI;
+                        nx = playerX + Math.sin(ang) * spawnR;
+                        nz = playerZ + Math.cos(ang) * spawnR;
                         h = getWorldHeight(nx, nz);
                         pathVal = getPathStrength(nx, nz);
                         cellKey = getTreeCell(nx, nz);

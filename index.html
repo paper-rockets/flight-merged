@@ -3072,7 +3072,8 @@ import terrainMtn2 from './terrain-mountains2.js';
             if (photoControls) {
                 photoControls.update();
             }
-            
+        }
+
         // Floating Crystals — respawn in Crystal Land (Z: 34,000 to 52,000)
         const crystalDist = 2800;
         const inCrystalLand = typeof playerGrp !== 'undefined' && playerGrp.position.z >= 32000 && playerGrp.position.z <= 54000;
@@ -3120,8 +3121,8 @@ import terrainMtn2 from './terrain-mountains2.js';
         }
         instCrystals.instanceMatrix.needsUpdate = true;
 
-
-        composer.render();
+        if (isPhotoMode) {
+            composer.render();
             return;
         }
 

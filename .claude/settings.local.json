@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la \"E:/Water Shaders/Water shader 2/open-sea-ocean\" 2>&1 | head -50)"
+    ]
+  }
+}

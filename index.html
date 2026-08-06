@@ -1860,8 +1860,8 @@ import terrainMtn2 from './terrain-mountains2.js';
         else tempCloudColor.setHex(0xffffff);
         instHighClouds.setColorAt(i, tempCloudColor);
     }
-    instClouds.instanceColor.needsUpdate = true;
-    instHighClouds.instanceColor.needsUpdate = true;
+    if (instClouds.instanceColor) instClouds.instanceColor.needsUpdate = true;
+    if (instHighClouds.instanceColor) instHighClouds.instanceColor.needsUpdate = true;
     
     instFlowers.receiveShadow = false;
     instFlowers.castShadow = false;

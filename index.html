@@ -216,22 +216,30 @@ import terrainMtn2 from './terrain-mountains2.js';
     import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
     import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
+    // ===== QUALITY TIER =====
+    // 'low' targets weak devices (e.g. Galaxy Tab S6 Lite for a young kid).
+    // Auto-defaults to low on ≤4GB devices; user choice (saved) always wins.
+    // Regular is the untouched full-quality path.
+    const _savedGfx = localStorage.getItem('gfxQuality');
+    const LOW_GFX = _savedGfx === 'low'
+        || (_savedGfx == null && typeof navigator.deviceMemory === 'number' && navigator.deviceMemory <= 4);
 
     let isWindOn = false;
     let isRainOn = false;
     let isWindTrailsOn = true;
     let isPhotoMode = false;
     let isFlightPaused = false;
-    let isShadowsOn = true;
+    let isShadowsOn = !LOW_GFX;
     let isTreeShadowsOn = false;
-    let shadowDistMode = 'Med';
-    let isBloomOn = true;
-    let isHD = true;
+    let shadowDistMode = LOW_GFX ? 'Close' : 'Med';
+    let isBloomOn = !LOW_GFX;
+    let isHD = !LOW_GFX;
     let photoControls = null;
     let cameraZoomDist = 12.0;
     let currentFrame = 0;
     let logicTimer = 0;
-    let terrainRes = 256;
+    let terrainRes = LOW_GFX ? 64 : 256;
+
 
             // PROCEDURAL NOISE & MULTI-BIOMES SETUP
     // ==========================================
@@ -432,7 +440,7 @@ import terrainMtn2 from './terrain-mountains2.js';
         treeShadows: isTreeShadowsOn,
         shadowDist: shadowDistMode,
         bloom: isBloomOn,
-        terrainRes: '256',
+        terrainRes: String(terrainRes),
         renderHD: isHD,
         treeColor0: '#ffffff',
         treeColor1: '#ddff88',
@@ -441,17 +449,22 @@ import terrainMtn2 from './terrain-mountains2.js';
         treeColor4: '#aaffaa',
         treeColor5: '#bbdd99',
         treeColor6: '#669966',
-        summerFilter: true,
+        summerFilter: !LOW_GFX,
         modelVisible: true,
         wind: isWindOn,
         rain: isRainOn,
         fogPlane: true,
-        godRays: true,
+        godRays: !LOW_GFX,
         godRayIntensity: 0.65,
-        treeScale: 1.5
+        treeScale: 1.5,
+        quality: LOW_GFX ? 'Low' : 'Regular'
     };
 
     const perfFolder = gui.addFolder('Performance');
+    perfFolder.add(params, 'quality', ['Regular', 'Low']).name('Quality').onChange(v => {
+        localStorage.setItem('gfxQuality', v === 'Low' ? 'low' : 'regular');
+        location.reload();
+    });
     perfFolder.add(params, 'renderHD').name('Render HD').onChange(v => {
         isHD = v;
         renderer.setPixelRatio(isHD ? Math.min(window.devicePixelRatio, 2) : 0.5);
@@ -626,12 +639,12 @@ import terrainMtn2 from './terrain-mountains2.js';
 
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 2.0, 30000); // Extended far plane so 20000-unit sun is visible
     camera.position.set(0, 9, 26);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, logarithmicDepthBuffer: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: !LOW_GFX, preserveDrawingBuffer: !LOW_GFX, logarithmicDepthBuffer: !LOW_GFX });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setPixelRatio(LOW_GFX ? 0.5 : Math.min(window.devicePixelRatio, 1.5));
     
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.enabled = !LOW_GFX;
+    renderer.shadowMap.type = LOW_GFX ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.9;
     container.appendChild(renderer.domElement);
@@ -639,7 +652,9 @@ import terrainMtn2 from './terrain-mountains2.js';
     const composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
     composer.addPass(renderPass);
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.8, 0.4, 1.5);
+    const _bloomRes = LOW_GFX ? new THREE.Vector2(window.innerWidth * 0.5, window.innerHeight * 0.5) : new THREE.Vector2(window.innerWidth, window.innerHeight);
+    const bloomPass = new UnrealBloomPass(_bloomRes, 0.8, 0.4, 1.5);
+    bloomPass.enabled = !LOW_GFX;
     composer.addPass(bloomPass); // Enable Selective Bloom
 
     const GhibliSummerShader = {
@@ -753,11 +768,11 @@ import terrainMtn2 from './terrain-mountains2.js';
     };
 
     const godRaysPass = new ShaderPass(GodRaysShader);
-    godRaysPass.enabled = true;
+    godRaysPass.enabled = !LOW_GFX;
     composer.addPass(godRaysPass);
 
     const summerPass = new ShaderPass(GhibliSummerShader);
-    summerPass.enabled = true;
+    summerPass.enabled = !LOW_GFX;
     composer.addPass(summerPass);
 
     let isSummerFilterOn = true;
@@ -1211,7 +1226,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     
     const ROCK_COUNT = 0;
     const BUSH_COUNT = 0;
-        const CLOUD_COUNT = 150;
+        const CLOUD_COUNT = LOW_GFX ? 40 : 150;
     const FLOWER_COUNT = 0; // Optimized for FPS
     const TREE_MULT = 0.25; // Slashed from 1.0 to massively reduce vertex load (from 17 million to 4 million)
     
@@ -1527,7 +1542,7 @@ import terrainMtn2 from './terrain-mountains2.js';
 
 
     // Rain System
-    const RAIN_COUNT = 15000;
+    const RAIN_COUNT = LOW_GFX ? 0 : 15000;
     const rainGeo = new THREE.BufferGeometry();
     const rainPositions = new Float32Array(RAIN_COUNT * 3);
     const rainSpeeds = new Float32Array(RAIN_COUNT);
@@ -1777,7 +1792,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     scene.add(instClouds);
 
     // Super High Cumulonimbus Clouds & See-Through Wispy Clouds
-    const HIGH_CLOUD_COUNT = 24;
+    const HIGH_CLOUD_COUNT = LOW_GFX ? 0 : 24;
     const baseCloudSpheres = [];
     const mainPillar = new THREE.DodecahedronGeometry(150, 1).toNonIndexed();
     mainPillar.scale(1, 1.2, 1);
@@ -1812,7 +1827,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     scene.add(instWispyClouds);
 
     // Far-Distance Mega Painted Clouds (Visible when Kiki climbs high)
-    const MEGA_CLOUD_COUNT = 24;
+    const MEGA_CLOUD_COUNT = LOW_GFX ? 0 : 24;
     const megaCloudMat = new THREE.MeshToonMaterial({ color: 0xfff6e3, transparent: true, opacity: 0.88 });
     const instMegaClouds = new THREE.InstancedMesh(highCloudGeo, megaCloudMat, MEGA_CLOUD_COUNT);
     instMegaClouds.frustumCulled = false;
@@ -1961,7 +1976,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     // ===================================================
     // 6.5 BOIDS (BIRDS)
     // ==========================================
-    const BIRD_COUNT = 40;
+    const BIRD_COUNT = LOW_GFX ? 12 : 40;
     const geoBird = new THREE.BufferGeometry();
     const s = 0.8;
     const bVerts = new Float32Array([
@@ -2814,7 +2829,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     const BASE_FOV = 60;
     const clock = new THREE.Clock();
     // --- Low-Poly Particle Starfield ---
-    const starCount = 8000;
+    const starCount = LOW_GFX ? 2000 : 8000;
     const starGeometry = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
 
@@ -3579,7 +3594,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     ];
 
     function createReverb() {
-        const length = audioCtx.sampleRate * 4; 
+        const length = audioCtx.sampleRate * (LOW_GFX ? 0.5 : 4); 
         const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
         for (let i = 0; i < 2; i++) {
             const channel = impulse.getChannelData(i);

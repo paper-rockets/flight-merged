@@ -2434,25 +2434,16 @@ import terrainMtn2 from './terrain-mountains2.js';
     let kikiModel = null;
     let whaleModel = null;
     let whaleMixer = null;
-    let porco1Model = null;
-    let porco2Model = null;
-    let porco3Model = null;
     let isModelVisible = true;
 
     const CHAR_CYCLE = [
         { id: 'kiki', nextLabel: 'Switch to Whale' },
-        { id: 'whale', nextLabel: 'Switch to Porco 1' },
-        { id: 'porco1', nextLabel: 'Switch to Porco 2' },
-        { id: 'porco2', nextLabel: 'Switch to Porco 3' },
-        { id: 'porco3', nextLabel: 'Switch to Kiki' }
+        { id: 'whale', nextLabel: 'Switch to Kiki' }
     ];
 
     function updateModelVisibility() {
         if (kikiModel) kikiModel.visible = isModelVisible && (currentCharacter === 'kiki');
         if (whaleModel) whaleModel.visible = isModelVisible && (currentCharacter === 'whale');
-        if (porco1Model) porco1Model.visible = isModelVisible && (currentCharacter === 'porco1');
-        if (porco2Model) porco2Model.visible = isModelVisible && (currentCharacter === 'porco2');
-        if (porco3Model) porco3Model.visible = isModelVisible && (currentCharacter === 'porco3');
 
         const btn = document.getElementById('invis-toggle');
         if (btn) btn.innerText = isModelVisible ? '👁 Model: VISIBLE' : '👁 Model: INVISIBLE';
@@ -2650,42 +2641,7 @@ import terrainMtn2 from './terrain-mountains2.js';
         (err) => console.warn("Could not load Princess.glb:", err)
     );
 
-    function setupPorcoModel(sceneObj, targetDim = 6.5) {
-        const box = new THREE.Box3().setFromObject(sceneObj);
-        const size = new THREE.Vector3();
-        box.getSize(size);
-        const center = new THREE.Vector3();
-        box.getCenter(center);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const s = maxDim > 0 ? (targetDim / maxDim) : 1.0;
-        sceneObj.scale.set(s, s, s);
-        sceneObj.position.set(-center.x * s, -center.y * s, -center.z * s);
-        sceneObj.rotation.y = Math.PI;
-        sceneObj.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-        sceneObj.visible = false;
-        playerVisuals.add(sceneObj);
-        return sceneObj;
-    }
-
-    gltfLoader.load('porco1/scene.gltf', (gltf) => {
-        porco1Model = setupPorcoModel(gltf.scene, 7.0);
-        updateModelVisibility();
-    }, undefined, (err) => console.warn("Could not load porco1:", err));
-
-    gltfLoader.load('porco2/scene.gltf', (gltf) => {
-        porco2Model = setupPorcoModel(gltf.scene, 7.0);
-        updateModelVisibility();
-    }, undefined, (err) => console.warn("Could not load porco2:", err));
-
-    gltfLoader.load('porco3/scene.gltf', (gltf) => {
-        porco3Model = setupPorcoModel(gltf.scene, 7.0);
-        updateModelVisibility();
-    }, undefined, (err) => console.warn("Could not load porco3:", err));
+    
 
 
 

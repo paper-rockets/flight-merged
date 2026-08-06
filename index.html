@@ -2969,10 +2969,18 @@ initMapUI();
         }
 
         for (let i = 0; i < CRYSTAL_COUNT; i++) {
+            if (!inCrystalLand) {
+                dummy.position.set(0, -9999, 0);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                instCrystals.setMatrixAt(i, dummy.matrix);
+                continue;
+            }
+
             instCrystals.getMatrixAt(i, dummy.matrix);
             dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
             
-            if (inCrystalLand && (Math.abs(dummy.position.x - playerGrp.position.x) > crystalDist || Math.abs(dummy.position.z - playerGrp.position.z) > crystalDist || dummy.position.y < -500)) {
+            if (dummy.position.y < -500 || Math.abs(dummy.position.x - playerGrp.position.x) > crystalDist || Math.abs(dummy.position.z - playerGrp.position.z) > crystalDist) {
                 const s = (30 + Math.random() * 60) * 3;
                 let dx = (Math.random() - 0.5) * crystalDist * 2.0;
                 let dz = (Math.random() - 0.5) * crystalDist * 2.0;
@@ -2980,7 +2988,7 @@ initMapUI();
                 const cZ = Math.max(18500, Math.min(35500, playerGrp.position.z + dz));
                 const cGroundY = getWorldHeight(cX, cZ);
                 
-                let spawnY = cGroundY + 200 + Math.random() * 200;
+                let spawnY = cGroundY + 100 + Math.random() * 150;
                 if (i % 5 === 0) {
                     spawnY = cGroundY + 15 + (s * 3.0); 
                 }
@@ -2993,11 +3001,7 @@ initMapUI();
             const localGroundY = getWorldHeight(dummy.position.x, dummy.position.z);
             const minHeight = localGroundY + 15 + (dummy.scale.y * 3.0); 
             if (dummy.position.y < minHeight) {
-                if (minHeight - dummy.position.y > 50) {
-                    dummy.position.y = minHeight;
-                } else {
-                    dummy.position.y += (minHeight - dummy.position.y) * dt * 5.0;
-                }
+                dummy.position.y = minHeight;
             }
 
             dummy.position.y += Math.sin(time * 0.3 + i * 2.0) * 0.15;

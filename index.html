@@ -48,6 +48,18 @@
       z-index: 20;
     }
 
+    #zoom-toggle {
+      position: fixed; right: 20px; bottom: 115px;
+      width: 75px; height: 40px; border-radius: 20px;
+      color: white; font-weight: bold; font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      user-select: none; pointer-events: auto;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      background: rgba(59, 130, 246, 0.55); border: 2px solid rgba(96, 165, 250, 0.7);
+      z-index: 20;
+    }
+
     @media (max-width: 768px) {
       #world-map { display: none !important; }
     }
@@ -181,6 +193,7 @@ console.error = function(...args) {
   <div id="touch-controls">
     <div id="joystick-base"><div id="joystick-knob"></div></div>
     <div id="boost-btn">BOOST</div>
+    <div id="zoom-toggle">Zoom Out</div>
   </div>
   
   <div id="pc-controls-hint" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 10px 20px; border-radius: 8px; font-family: sans-serif; pointer-events: none; z-index: 100;">
@@ -2752,6 +2765,17 @@ initMapUI();
     boostBtn.addEventListener('touchcancel', resetBoost);
     boostBtn.addEventListener('mouseup', resetBoost);
     boostBtn.addEventListener('mouseleave', resetBoost);
+
+    const zoomBtn = document.getElementById('zoom-toggle');
+    zoomBtn.addEventListener('click', () => {
+        if (cameraZoomDist > 25.0) {
+            cameraZoomDist = 12.0;
+            zoomBtn.innerText = 'Zoom Out';
+        } else {
+            cameraZoomDist = 50.0;
+            zoomBtn.innerText = 'Zoom In';
+        }
+    });
 
 
 

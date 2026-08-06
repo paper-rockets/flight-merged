@@ -2684,7 +2684,7 @@ initMapUI();
         if (e.target.tagName !== 'CANVAS') return; // Ignore touches on UI buttons
         e.preventDefault();
 
-        if (e.touches.length === 1) {
+        if (activeTouchId === null) {
             const touch = e.changedTouches[0];
             activeTouchId = touch.identifier;
             

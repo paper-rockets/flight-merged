@@ -27,11 +27,8 @@
 <body>
 
 <div id="toolbar">
-    <label>Model: 
-        <select id="model-select">
-            <option value="assets/Pine_ultra_fast.glb">Pine 1</option>
-            <option value="assets/Pine_1_ultra_fast.glb">Pine 2</option>
-        </select>
+    <label>Load Model: 
+        <input type="file" id="file-input" accept=".glb,.gltf">
     </label>
 
     <label>Rotation: <input type="range" id="rot-slider" min="0" max="360" value="0"></label>
@@ -167,8 +164,13 @@ function render() {
     renderer.render(scene, camera);
 }
 
-// Event Listeners
-document.getElementById('model-select').addEventListener('change', (e) => loadModel(e.target.value));
+document.getElementById('file-input').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+        const url = URL.createObjectURL(file);
+        loadModel(url);
+    }
+});
 document.getElementById('mode-select').addEventListener('change', updateRenderMode);
 document.getElementById('rot-slider').addEventListener('input', render);
 
@@ -183,7 +185,11 @@ document.getElementById('btn-capture').addEventListener('click', () => {
     const dataURL = renderer.domElement.toDataURL('image/png');
     const link = document.createElement('a');
     
-    const modelName = document.getElementById('model-select').value.split('/').pop().replace('.glb', '');
+    let modelName = "model";
+    const fileInput = document.getElementById('file-input');
+    if (fileInput.files.length > 0) {
+        modelName = fileInput.files[0].name.replace('.glb', '').replace('.gltf', '');
+    }
     const mode = document.getElementById('mode-select').value;
     const angle = document.getElementById('rot-slider').value;
     
@@ -191,9 +197,6 @@ document.getElementById('btn-capture').addEventListener('click', () => {
     link.href = dataURL;
     link.click();
 });
-
-// Initial Load
-loadModel(document.getElementById('model-select').value);
 
 </script>
 </body>

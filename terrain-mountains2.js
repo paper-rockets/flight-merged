@@ -6,8 +6,8 @@ const colorMountainGrass= new THREE.Color(0x4b7043);
 const colorMountainRock = new THREE.Color(0x5a5e6b);
 const colorSnow         = new THREE.Color(0xf5f6fa);
 
-// Centered inside Misty Mountains II zone (48,000m to 54,000m)
-const CHAIN_CENTER_Z = 51000;
+// Centered inside Misty Mountains II zone (104,000m to 134,000m)
+const CHAIN_CENTER_Z = 119000;
 const CHAIN_ANGLE = Math.PI / 5.5; // ~32.7° diagonal spine
 const _cosA = Math.cos(CHAIN_ANGLE);
 const _sinA = Math.sin(CHAIN_ANGLE);

@@ -295,17 +295,17 @@ let isInitializingGui = true;
 
 
     const ZONES = [
-        { start:     0, end:  6000, module: terrainMtn,      treesOk: false, name: '🏔️ Misty Mountains I'   },
-        { start:  6000, end: 18000, module: terrainGhibli,   treesOk: true,  name: '🌳 Ghibli Land'         },
-        { start: 18000, end: 30000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle I'        },
-        { start: 30000, end: 48000, module: terrainPlains,   treesOk: true,  name: '🌾 Golden Plains'        },
-        { start: 48000, end: 66000, module: terrainCrystal,  treesOk: false, name: '💎 Crystal Land'         },
-        { start: 66000, end: 78000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle II'       },
-        { start: 78000, end: 90000, module: terrainPlains,   treesOk: true,  name: '🌾 Golden Plains II'     },
-        { start: 90000, end: 102000, module: terrainGhibli,  treesOk: true,  name: '🌳 Ghibli Land II'       },
-        { start: 102000, end: 108000, module: terrainMtn2,   treesOk: false, name: '🏔️ Misty Mountains II'  },
+        { start:      0, end:   8000, module: terrainArch,     treesOk: true,  name: '🌊 Archipelago',        archT: (t) => t * 2.0 },
+        { start:   8000, end:  16000, module: terrainGhibli,   treesOk: true,  name: '🌳 Ghibli Land'         },
+        { start:  16000, end:  24000, module: terrainPlains,   treesOk: true,  name: '🌾 Golden Plains'        },
+        { start:  24000, end:  40000, module: terrainMtn,      treesOk: false, name: '🏔️ Misty Mountains I'   },
+        { start:  40000, end:  70000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle'          },
+        { start:  70000, end: 104000, module: terrainCrystal,  treesOk: false, name: '💎 Crystal Land'         },
+        { start: 104000, end: 134000, module: terrainMtn2,     treesOk: false, name: '🏔️ Misty Mountains II'  },
+        { start: 134000, end: 198000, module: terrainGhibli,   treesOk: true,  name: '🌳 Ghibli Land II'       },
+        { start: 198000, end: 214000, module: terrainArch,     treesOk: false, name: '🌊 Open Ocean'           },
     ];
-    const WORLD_LENGTH = 108000;
+    const WORLD_LENGTH = 214000;
     const BLEND_WIDTH  = 600;
     const blendColor1  = new THREE.Color();
     const blendColor2  = new THREE.Color();
@@ -407,15 +407,15 @@ let isInitializingGui = true;
 initMapUI();
 
     const _mapColors = {
-        '🏔️ Misty Mountains I':  '#6b7280',
+        '🌊 Archipelago':       '#2a6aad',
         '🌳 Ghibli Land':       '#4a9640',
-        '🌴 Lush Jungle I':      '#286330',
         '🌾 Golden Plains':     '#c8a832',
-        '💎 Crystal Land':        '#5b8fa8',
-        '🌴 Lush Jungle II':     '#286330',
-        '🌾 Golden Plains II':   '#c8a832',
+        '🏔️ Misty Mountains I': '#6b7280',
+        '🌴 Lush Jungle':        '#286330',
+        '💎 Crystal Land':      '#5b8fa8',
+        '🏔️ Misty Mountains II':'#6b7280',
         '🌳 Ghibli Land II':    '#4a9640',
-        '🏔️ Misty Mountains II': '#6b7280',
+        '🌊 Open Ocean':        '#1d4ed8',
     };
 
     function _drawWorldMap() {
@@ -3019,9 +3019,9 @@ initMapUI();
             }
         }
 
-        // Floating Crystals — respawn in Crystal Land (Z: 48,000 to 66,000)
+        // Floating Crystals — respawn in Crystal Land (Z: 70,000 to 104,000)
         const crystalDist = 2400;
-        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 46000 && wz <= 68000; })();
+        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 68000 && wz <= 106000; })();
         
         if (typeof matCrystal !== 'undefined' && matCrystal.userData.shader) {
             matCrystal.userData.shader.uniforms.uTime.value = time;
@@ -3044,7 +3044,7 @@ initMapUI();
                 let dx = (Math.random() - 0.5) * crystalDist * 2.0;
                 let dz = (Math.random() - 0.5) * crystalDist * 2.0;
                 const cX = playerGrp.position.x + dx;
-                const cZ = Math.max(48500, Math.min(65500, playerGrp.position.z + dz));
+                const cZ = Math.max(70500, Math.min(103500, playerGrp.position.z + dz));
                 const cGroundY = getWorldHeight(cX, cZ);
                 
                 let spawnY = cGroundY + 100 + Math.random() * 150;

@@ -119,7 +119,6 @@ console.error = function(...args) {
       <button id="music-toggle">Music</button>
       <button id="track-toggle">Track: Valley Wind</button>
       <button id="wind-toggle">Wind: ON</button>
-      <button id="zoom-toggle">Zoom In</button>
       <button id="fullscreen-toggle">Fullscreen</button>
   </div>
 
@@ -783,11 +782,19 @@ import terrainMtn2 from './terrain-mountains2.js';
     geoCrystal.scale(1, 3, 1);
     geoCrystal.computeVertexNormals();
 
-    const matCrystal = new THREE.MeshStandardMaterial({
+    const matCrystal = new THREE.MeshPhysicalMaterial({
         roughness: 0.08,
         metalness: 0.15,
         transparent: true,
         opacity: 0.82,
+        transmission: 0.3,
+        thickness: 2.0,
+        ior: 2.2,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        sheen: 1.0,
+        sheenRoughness: 0.3,
+        sheenColor: new THREE.Color(0xffffff),
         envMapIntensity: 1.5,
         depthWrite: true,
         depthTest: true,
@@ -796,7 +803,7 @@ import terrainMtn2 from './terrain-mountains2.js';
 
     matCrystal.onBeforeCompile = (shader) => {
         shader.uniforms.crystalGlow = { value: 0.0 };
-        shader.uniforms.baseGlow = { value: 2.5 };
+        shader.uniforms.baseGlow = { value: 1.2 };
         shader.uniforms.nightGlowMult = { value: 1.5 };
         shader.uniforms.uCustomColors = { value: [
             new THREE.Color('#6a00ff'), new THREE.Color('#ff0066'),
@@ -901,13 +908,8 @@ import terrainMtn2 from './terrain-mountains2.js';
         ).replace(
             '#include <emissivemap_fragment>',
             `#include <emissivemap_fragment>
-             // Inner glow — brighter at edges, staggered pulse per crystal using world position
-             float innerGlow = fresnel * 0.9 + 0.35;
-             float pulse = sin(uTime * 1.4 + vWorldPosC.x * 0.008 + vWorldPosC.z * 0.008) * 0.18 + 0.82;
-             // Extra saturation on emissive so it reads as vivid neon
-             float lumaC = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
-             vec3 vividGlow = clamp(mix(vec3(lumaC), diffuseColor.rgb, 3.5), 0.0, 1.0);
-             totalEmissiveRadiance += vividGlow * (baseGlow * innerGlow * pulse + crystalGlow * nightGlowMult) + vec3(1.0) * fresnel * 0.15;
+             float innerGlow = fresnel * 0.4 + 0.15;
+             totalEmissiveRadiance += diffuseColor.rgb * (baseGlow * innerGlow + crystalGlow * nightGlowMult);
             `
         );
     };
@@ -2244,9 +2246,7 @@ import terrainMtn2 from './terrain-mountains2.js';
             treeMeshes.forEach((instMesh, meshIdx) => {
             const count = instMesh.maxCount || instMesh.count;
             let treeUpdated = false;
-            // Update 1/30th of trees per frame to keep noise-sampling cost low on
-            // mobile. Timing no longer matters for pop-in: the far-ring spawn below
-            // places respawns at the fog edge regardless of how late they fire.
+            // Update 1/30th of trees per frame instead of 1/10th to save massive CPU overhead
             for (let i = currentFrame % 30; i < count; i += 30) {
                 instMesh.getMatrixAt(i, dummy.matrix);
                 dummy.position.setFromMatrixPosition(dummy.matrix);
@@ -2261,18 +2261,9 @@ import terrainMtn2 from './terrain-mountains2.js';
                     let nx, nz, h, pathVal, cellKey;
                     let attempts = 0;
 
-                    // Forward heading on the XZ plane: base dir is (0,0,-1) rotated by
-                    // yaw, so the travel direction angle is (playerYaw + PI).
-                    const fwdAng = playerYaw + Math.PI;
-
                     while(!valid && attempts < 15) {
-                        // Spawn in the forward hemisphere at the far ring (0.6–1.0 of
-                        // treeDist) so new trees appear at/near the fog edge and stream
-                        // in gradually, instead of popping into clear view up close.
-                        const spawnR = treeDist * (0.6 + Math.random() * 0.4);
-                        const ang = fwdAng + (Math.random() - 0.5) * Math.PI;
-                        nx = playerX + Math.sin(ang) * spawnR;
-                        nz = playerZ + Math.cos(ang) * spawnR;
+                        nx = playerX + (Math.random() - 0.5) * treeDist * 2.0;
+                        nz = playerZ + (Math.random() - 0.5) * treeDist * 2.0;
                         h = getWorldHeight(nx, nz);
                         pathVal = getPathStrength(nx, nz);
                         cellKey = getTreeCell(nx, nz);
@@ -3085,7 +3076,7 @@ import terrainMtn2 from './terrain-mountains2.js';
 
         // Floating Crystals — respawn in Crystal Land (Z: 34,000 to 52,000)
         const crystalDist = 2800;
-        const inCrystalLand = typeof playerGrp !== 'undefined' && playerGrp.position.z >= 32000 && playerGrp.position.z <= 54000;
+        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 32000 && wz <= 54000; })();
         
         if (typeof matCrystal !== 'undefined' && matCrystal.userData.shader) {
             matCrystal.userData.shader.uniforms.uTime.value = time;
@@ -3233,11 +3224,14 @@ import terrainMtn2 from './terrain-mountains2.js';
         }
         camera.updateProjectionMatrix();
 
-        // Keep the physical sun and flare exactly 20,000 units away along the Z axis from Kiki so she can never reach it
+        // Keep the physical sun and flare exactly 20,000 units away directly in front of the player's flight path
         currentSunY += (target.sunY - currentSunY) * dt * 2.0;
-        staticSun.position.set(playerGrp.position.x, playerGrp.position.y * 0.45 + currentSunY, playerGrp.position.z - 20000);
+        const sunForward = new THREE.Vector3(0, 0, -20000);
+        sunForward.applyQuaternion(playerGrp.quaternion);
+        staticSun.position.copy(playerGrp.position).add(sunForward);
+        staticSun.position.y = playerGrp.position.y * 0.45 + currentSunY;
 
-        // Place the sun incredibly far away and low on the horizon for a permanent sunset glare effect!
+        // Update directional light to come from the sun
         const toSun = staticSun.position.clone().sub(playerGrp.position).normalize();
         dirLight.position.copy(playerGrp.position).add(toSun.multiplyScalar(2000));
         dirLight.target.position.copy(playerGrp.position);

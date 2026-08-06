@@ -239,7 +239,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     let currentFrame = 0;
     let logicTimer = 0;
     let terrainRes = LOW_GFX ? 64 : 256;
-
+let isInitializingGui = true;
 
             // PROCEDURAL NOISE & MULTI-BIOMES SETUP
     // ==========================================
@@ -463,7 +463,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     const perfFolder = gui.addFolder('Performance');
     perfFolder.add(params, 'quality', ['Regular', 'Low']).name('Quality').onChange(v => {
         localStorage.setItem('gfxQuality', v === 'Low' ? 'low' : 'regular');
-        location.reload();
+        if (!isInitializingGui) location.reload();
     });
     perfFolder.add(params, 'renderHD').name('Render HD').onChange(v => {
         isHD = v;
@@ -3865,6 +3865,38 @@ import terrainMtn2 from './terrain-mountains2.js';
         treeFolder.addColor(params, 'treeColor4').name('Color 5').onChange(v => updateTreeColorForIndex(4, v));
         treeFolder.addColor(params, 'treeColor5').name('Color 6').onChange(v => updateTreeColorForIndex(5, v));
         treeFolder.addColor(params, 'treeColor6').name('Color 7').onChange(v => updateTreeColorForIndex(6, v));
+
+        // ==========================================
+        // SYSTEM SETTINGS (SAVE/LOAD)
+        // ==========================================
+        const sysFolder = gui.addFolder('System Settings');
+        sysFolder.add({
+            saveSettings: () => {
+                const data = gui.save();
+                localStorage.setItem('flightSettings', JSON.stringify(data));
+                const prevTitle = sysFolder.title || 'System Settings';
+                sysFolder.title('Saved!');
+                setTimeout(() => sysFolder.title(prevTitle), 1500);
+            }
+        }, 'saveSettings').name('Save All Settings');
+        
+        sysFolder.add({
+            resetSettings: () => {
+                localStorage.removeItem('flightSettings');
+                localStorage.removeItem('gfxQuality');
+                location.reload();
+            }
+        }, 'resetSettings').name('Reset to Default');
+
+        // Load settings if they exist
+        try {
+            const savedData = localStorage.getItem('flightSettings');
+            if (savedData) gui.load(JSON.parse(savedData));
+        } catch(e) {
+            console.error('Failed to load settings', e);
+        }
+        
+        isInitializingGui = false;
     }
 
     animate();

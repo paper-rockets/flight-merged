@@ -153,6 +153,8 @@ console.error = function(...args) {
       <label style="font-size:12px; display:block; margin-bottom:4px;">Night Glow <input type="range" id="c-nightGlow" min="0" max="5" step="0.1" value="1.5" style="width:100%; box-sizing:border-box; display:block;"></label>
       <label style="font-size:12px; display:block; margin-bottom:4px;">Roughness <input type="range" id="c-roughness" min="0" max="1" step="0.05" value="0.08" style="width:100%; box-sizing:border-box; display:block;"></label>
       <label style="font-size:12px; display:block; margin-bottom:4px;">Metalness <input type="range" id="c-metalness" min="0" max="1" step="0.05" value="0.15" style="width:100%; box-sizing:border-box; display:block;"></label>
+      <label style="font-size:12px; display:block; margin-bottom:4px;">Transmission <input type="range" id="c-transmission" min="0" max="1" step="0.05" value="1.0" style="width:100%; box-sizing:border-box; display:block;"></label>
+      <label style="font-size:12px; display:block; margin-bottom:4px;">Thickness <input type="range" id="c-thickness" min="0" max="20" step="0.5" value="10.0" style="width:100%; box-sizing:border-box; display:block;"></label>
     </div>
     <div style="margin-bottom: 5px;">
       <strong style="font-size:13px; display:block; margin-bottom:5px; color:#aaa;">Ground Crystals (Colors)</strong>
@@ -777,7 +779,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     // ==========================================
     // GIANT FLOATING CRYSTALS (Instanced)
     // ==========================================
-    const CRYSTAL_COUNT = 40;
+    const CRYSTAL_COUNT = 12;
     const geoCrystal = new THREE.OctahedronGeometry(1, 1).toNonIndexed();
     geoCrystal.scale(1, 3, 1);
     geoCrystal.computeVertexNormals();
@@ -787,8 +789,8 @@ import terrainMtn2 from './terrain-mountains2.js';
         metalness: 0.15,
         transparent: true,
         opacity: 0.82,
-        transmission: 0.3,
-        thickness: 2.0,
+        transmission: 1.0,
+        thickness: 10.0,
         ior: 2.2,
         clearcoat: 1.0,
         clearcoatRoughness: 0.05,
@@ -798,12 +800,13 @@ import terrainMtn2 from './terrain-mountains2.js';
         envMapIntensity: 1.5,
         depthWrite: true,
         depthTest: true,
+        fog: false,
         side: THREE.DoubleSide
     });
 
     matCrystal.onBeforeCompile = (shader) => {
         shader.uniforms.crystalGlow = { value: 0.0 };
-        shader.uniforms.baseGlow = { value: 1.2 };
+        shader.uniforms.baseGlow = { value: 1.8 };
         shader.uniforms.nightGlowMult = { value: 1.5 };
         shader.uniforms.uCustomColors = { value: [
             new THREE.Color('#6a00ff'), new THREE.Color('#ff0066'),
@@ -938,6 +941,8 @@ import terrainMtn2 from './terrain-mountains2.js';
     if (getElem('c-roughness')) {
         getElem('c-roughness').addEventListener('input', (e) => matCrystal.roughness = parseFloat(e.target.value));
         getElem('c-metalness').addEventListener('input', (e) => matCrystal.metalness = parseFloat(e.target.value));
+        getElem('c-transmission').addEventListener('input', (e) => matCrystal.transmission = parseFloat(e.target.value));
+        getElem('c-thickness').addEventListener('input', (e) => matCrystal.thickness = parseFloat(e.target.value));
         getElem('c-fly-opacity').addEventListener('input', (e) => matCrystal.opacity = parseFloat(e.target.value));
 
         getElem('c-fly-hue').addEventListener('input', (e) => {
@@ -3081,7 +3086,7 @@ import terrainMtn2 from './terrain-mountains2.js';
         }
 
         // Floating Crystals — respawn in Crystal Land (Z: 34,000 to 52,000)
-        const crystalDist = 2800;
+        const crystalDist = 1200;
         const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 32000 && wz <= 54000; })();
         
         if (typeof matCrystal !== 'undefined' && matCrystal.userData.shader) {

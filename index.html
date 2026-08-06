@@ -277,12 +277,16 @@ let isInitializingGui = true;
 
     const ZONES = [
         { start:     0, end:  6000, module: terrainMtn,      treesOk: false, name: '🏔️ Misty Mountains I'   },
-        { start:  6000, end: 18000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle I'        },
-        { start: 18000, end: 36000, module: terrainCrystal,  treesOk: false, name: '💎 Crystal Land'         },
-        { start: 36000, end: 48000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle II'       },
-        { start: 48000, end: 54000, module: terrainMtn2,     treesOk: false, name: '🏔️ Misty Mountains II'  },
+        { start:  6000, end: 18000, module: terrainGhibli,   treesOk: true,  name: '🌳 Ghibli Land'         },
+        { start: 18000, end: 30000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle I'        },
+        { start: 30000, end: 48000, module: terrainPlains,   treesOk: true,  name: '🌾 Golden Plains'        },
+        { start: 48000, end: 66000, module: terrainCrystal,  treesOk: false, name: '💎 Crystal Land'         },
+        { start: 66000, end: 78000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle II'       },
+        { start: 78000, end: 90000, module: terrainPlains,   treesOk: true,  name: '🌾 Golden Plains II'     },
+        { start: 90000, end: 102000, module: terrainGhibli,  treesOk: true,  name: '🌳 Ghibli Land II'       },
+        { start: 102000, end: 108000, module: terrainMtn2,   treesOk: false, name: '🏔️ Misty Mountains II'  },
     ];
-    const WORLD_LENGTH = 54000;
+    const WORLD_LENGTH = 108000;
     const BLEND_WIDTH  = 600;
     const blendColor1  = new THREE.Color();
     const blendColor2  = new THREE.Color();
@@ -385,9 +389,13 @@ initMapUI();
 
     const _mapColors = {
         '🏔️ Misty Mountains I':  '#6b7280',
+        '🌳 Ghibli Land':       '#4a9640',
         '🌴 Lush Jungle I':      '#286330',
+        '🌾 Golden Plains':     '#c8a832',
         '💎 Crystal Land':        '#5b8fa8',
         '🌴 Lush Jungle II':     '#286330',
+        '🌾 Golden Plains II':   '#c8a832',
+        '🌳 Ghibli Land II':    '#4a9640',
         '🏔️ Misty Mountains II': '#6b7280',
     };
 
@@ -1562,9 +1570,12 @@ initMapUI();
     const instTree2 = new THREE.InstancedMesh(geoTree2, matTree, Math.floor(3600 * TREE_MULT));
     const instTree3 = new THREE.InstancedMesh(geoTree3, matTree, Math.floor(3600 * TREE_MULT));
     const instTree4 = new THREE.InstancedMesh(geoTree4, matTree, Math.floor(2400 * TREE_MULT));
-    const instTree5 = new THREE.InstancedMesh(geoTree5, matTree, Math.floor(2400 * TREE_MULT));
-    const instTree6 = new THREE.InstancedMesh(geoTree6, matTree, Math.floor(720 * TREE_MULT)); // Reduced pink trees
-    
+    const instOak1 = new THREE.InstancedMesh(geoTree1, matTree, Math.floor(2400 * TREE_MULT));
+    const instOak2 = new THREE.InstancedMesh(geoTree2, matTree, Math.floor(2400 * TREE_MULT));
+    const instOak3 = new THREE.InstancedMesh(geoTree3, matTree, Math.floor(2400 * TREE_MULT));
+    scene.add(instOak1);
+    scene.add(instOak2);
+    scene.add(instOak3);
     
     let treeGreenVariations = [
         0xffffff, // Normal white
@@ -1576,7 +1587,7 @@ initMapUI();
         0x669966  // Deep forest green
     ];
     const tempTreeColor = new THREE.Color();
-    const treeMeshes = [instTree1, instTree2, instTree3, instTree4];
+    const treeMeshes = [instTree1, instTree2, instTree3, instTree4, instOak1, instOak2, instOak3];
     treeMeshes.forEach(mesh => {
         mesh.maxCount = mesh.count;
         for (let i = 0; i < mesh.count; i++) {
@@ -2201,9 +2212,17 @@ initMapUI();
                         pathVal = getPathStrength(nx, nz);
                         cellKey = getTreeCell(nx, nz);
                         
-                        let isClearing = snoise(nx * 0.003, nz * 0.003 + 50) > 0.2; // Massive sweeping plains
+                        let isClearing = snoise(nx * 0.003, nz * 0.003 + 50) > 0.25;
 
-                        if (!isClearing && h > 3.5 && h < 45 && pathVal < 0.1 && isTreeZone(nz) && (Math.random() > 0.1)) { 
+                        const bName = ZONES[_zoneIdxAt(_wrapZ(nz))].name;
+                        let biomeMatch = true;
+                        if (bName.includes('Golden Plains')) {
+                            if (meshIdx < 4) biomeMatch = false; // Golden Plains gets Oak trees
+                        } else {
+                            if (meshIdx >= 4) biomeMatch = false; // Ghibli Land & Jungle get Pine trees
+                        }
+
+                        if (!isClearing && h > 3.5 && h < 45 && pathVal < 0.1 && isTreeZone(nz) && biomeMatch && (Math.random() > 0.1)) { 
                             if (!treeGrid.has(cellKey)) {
                                 valid = true;
                             }
@@ -2214,10 +2233,10 @@ initMapUI();
                     if (valid) {
                         treeGrid.add(cellKey);
                         dummy.position.set(nx, h, nz);
-                        dummy.rotation.set(0, Math.random() * Math.PI, 0);
+                        dummy.rotation.set(0, Math.random() * Math.PI * 2.0, 0); // 360 degree rotation variation
                         
-                        let scale = 0.7 + Math.random() * 1.1;
-                        dummy.scale.setScalar(scale);
+                        let baseS = 0.75 + Math.random() * 1.1;
+                        dummy.scale.set(baseS * (0.85 + Math.random() * 0.3), baseS * (0.9 + Math.random() * 0.25), baseS * (0.85 + Math.random() * 0.3));
                         tempTreeColor.setHex(treeGreenVariations[Math.floor(Math.random() * treeGreenVariations.length)]);
                         instMesh.setColorAt(i, tempTreeColor);
                     } else {
@@ -2499,6 +2518,16 @@ initMapUI();
 
     gltfLoader.load('assets/Pine_1_ultra_fast.glb', (gltf) => {
         applyGLBPineTree(gltf, [instTree2, instTree4], 20.0);
+    });
+
+    gltfLoader.load('assets/tree_oak1.glb', (gltf) => {
+        applyGLBPineTree(gltf, [instOak1], 18.0);
+    });
+    gltfLoader.load('assets/tree_oak2.glb', (gltf) => {
+        applyGLBPineTree(gltf, [instOak2], 20.0);
+    });
+    gltfLoader.load('assets/tree_oak3.glb', (gltf) => {
+        applyGLBPineTree(gltf, [instOak3], 22.0);
     });
 
     gltfLoader.load(
@@ -2960,9 +2989,9 @@ initMapUI();
             }
         }
 
-        // Floating Crystals — respawn in Crystal Land (Z: 18,000 to 36,000)
+        // Floating Crystals — respawn in Crystal Land (Z: 48,000 to 66,000)
         const crystalDist = 2400;
-        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 16000 && wz <= 38000; })();
+        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 46000 && wz <= 68000; })();
         
         if (typeof matCrystal !== 'undefined' && matCrystal.userData.shader) {
             matCrystal.userData.shader.uniforms.uTime.value = time;
@@ -2985,7 +3014,7 @@ initMapUI();
                 let dx = (Math.random() - 0.5) * crystalDist * 2.0;
                 let dz = (Math.random() - 0.5) * crystalDist * 2.0;
                 const cX = playerGrp.position.x + dx;
-                const cZ = Math.max(18500, Math.min(35500, playerGrp.position.z + dz));
+                const cZ = Math.max(48500, Math.min(65500, playerGrp.position.z + dz));
                 const cGroundY = getWorldHeight(cX, cZ);
                 
                 let spawnY = cGroundY + 100 + Math.random() * 150;

@@ -48,18 +48,6 @@
       z-index: 20;
     }
 
-    #zoom-toggle {
-      position: fixed; right: 20px; bottom: 115px;
-      width: 75px; height: 40px; border-radius: 20px;
-      color: white; font-weight: bold; font-size: 13px;
-      display: flex; align-items: center; justify-content: center;
-      user-select: none; pointer-events: auto;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-      backdrop-filter: blur(4px);
-      background: rgba(59, 130, 246, 0.55); border: 2px solid rgba(96, 165, 250, 0.7);
-      z-index: 20;
-    }
-
     @media (max-width: 768px) {
       #world-map { display: none !important; }
     }
@@ -81,12 +69,6 @@
       background: rgba(255, 255, 255, 0.85);
     }
 
-
-    @media (max-width: 480px) {
-      .settings-label { display: none; }
-      .settings-icon { display: inline !important; }
-      #top-bar { gap: 8px; }
-    }
 
     @media (hover: hover) and (pointer: fine) {
       #touch-controls { display: none; }
@@ -118,10 +100,10 @@ console.error = function(...args) {
   
   <div id="top-bar" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px;">
     <button id="pause-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">⏸</button>
-    <div id="fps-counter" style="color: #fff; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; white-space: nowrap;">0 FPS</div>
-    <div id="biome-label" style="color: #ffe066; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; opacity: 0.9; white-space: nowrap;"></div>
+    <div id="fps-counter" style="color: #fff; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none;">0 FPS</div>
+    <div id="biome-label" style="color: #ffe066; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; opacity: 0.9;"></div>
     <button id="time-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">☀️</button>
-    <button id="gui-toggle-btn" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-left: 6px;"><span class="settings-label">⚙️ Settings (H)</span><span class="settings-icon" style="display:none;">⚙️</span></button>
+    <button id="gui-toggle-btn" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-left: 6px;">⚙️ Settings (H)</button>
   </div>
 
   <!-- Mini-map overlay -->
@@ -199,7 +181,6 @@ console.error = function(...args) {
   <div id="touch-controls">
     <div id="joystick-base"><div id="joystick-knob"></div></div>
     <div id="boost-btn">BOOST</div>
-    <div id="zoom-toggle">Zoom Out</div>
   </div>
   
   <div id="pc-controls-hint" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 10px 20px; border-radius: 8px; font-family: sans-serif; pointer-events: none; z-index: 100;">
@@ -2684,7 +2665,7 @@ initMapUI();
         if (e.target.tagName !== 'CANVAS') return; // Ignore touches on UI buttons
         e.preventDefault();
 
-        if (activeTouchId === null) {
+        if (e.touches.length === 1) {
             const touch = e.changedTouches[0];
             activeTouchId = touch.identifier;
             
@@ -2771,17 +2752,6 @@ initMapUI();
     boostBtn.addEventListener('touchcancel', resetBoost);
     boostBtn.addEventListener('mouseup', resetBoost);
     boostBtn.addEventListener('mouseleave', resetBoost);
-
-    const zoomBtn = document.getElementById('zoom-toggle');
-    zoomBtn.addEventListener('click', () => {
-        if (cameraZoomDist > 25.0) {
-            cameraZoomDist = 12.0;
-            zoomBtn.innerText = 'Zoom Out';
-        } else {
-            cameraZoomDist = 50.0;
-            zoomBtn.innerText = 'Zoom In';
-        }
-    });
 
 
 
@@ -2989,10 +2959,7 @@ initMapUI();
             // Only update DOM text once per second to prevent browser layout thrashing!
             document.getElementById('fps-counter').innerText = currentFps + ' FPS | ALT: ' + currentAlt + 'm';
         }
-        const isOcean = Math.max(0, 1.0 - (currentGroundY / 5.0)); // 1.0 over ocean/beach, 0.0 over high ground
-        if (isOcean > 0.3 && Math.random() < 0.002) {
-            playSeagullCall();
-        }
+
         
         // 3-Stage Lighting Engine Lerp
         const target = envConfigs[timePhase];
@@ -3364,36 +3331,7 @@ initMapUI();
         noiseSource.start();
     }
 
-    function playSeagullCall() {
-        if (!audioCtx || audioCtx.state !== 'running') return;
-        const now = audioCtx.currentTime;
-        const callCount = 2 + Math.floor(Math.random() * 2);
-        for (let i = 0; i < callCount; i++) {
-            const startT = now + i * 0.4;
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            const filter = audioCtx.createBiquadFilter();
 
-            osc.type = 'sawtooth';
-            filter.type = 'bandpass';
-            filter.frequency.value = 1800;
-            filter.Q.value = 4.0;
-
-            osc.frequency.setValueAtTime(1400 + Math.random() * 200, startT);
-            osc.frequency.exponentialRampToValueAtTime(800 + Math.random() * 150, startT + 0.28);
-
-            gain.gain.setValueAtTime(0.001, startT);
-            gain.gain.linearRampToValueAtTime(0.03, startT + 0.05);
-            gain.gain.exponentialRampToValueAtTime(0.001, startT + 0.32);
-
-            osc.connect(filter);
-            filter.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            osc.start(startT);
-            osc.stop(startT + 0.35);
-        }
-    }
 
     // ==========================================
     // 10. PROCEDURAL AMBIENT MUSIC

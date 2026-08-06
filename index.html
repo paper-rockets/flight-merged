@@ -708,9 +708,9 @@ import terrainMtn2 from './terrain-mountains2.js';
             tDiffuse: { value: null },
             uSunScreenPos: { value: new THREE.Vector2(0.5, 0.5) },
             uIntensity: { value: 0.65 },
-            uDecay: { value: 0.975 },
-            uDensity: { value: 0.65 },
-            uWeight: { value: 0.24 },
+            uDecay: { value: 0.984 },
+            uDensity: { value: 0.50 },
+            uWeight: { value: 0.16 },
             uSunVisible: { value: 1.0 }
         },
         vertexShader: `
@@ -736,23 +736,24 @@ import terrainMtn2 from './terrain-mountains2.js';
                 // Direction from this pixel toward the sun
                 vec2 deltaUV = (vUv - uSunScreenPos);
                 float dist = length(deltaUV);
-                deltaUV *= (1.0 / 100.0) * uDensity; // 100 samples
+                deltaUV *= (1.0 / 150.0) * uDensity; // 150 samples
 
-                // No dither, relying on higher sample count and lower density for smoothness
+                // No dither, perfectly smooth using ultra-high sample count and micro-steps
                 float dither = 0.0;
                 vec2 sampleUV = vUv - (deltaUV * dither);
                 
                 float illumination = 0.0;
-                float currentDecay = 1.0;
+                float currentWeight = uWeight;
                 
-                for(int i = 0; i < 100; i++) {
+                for(int i = 0; i < 150; i++) {
                     sampleUV -= deltaUV;
-                    vec4 samp = texture2D(tDiffuse, clamp(sampleUV, 0.0, 1.0));
+                    // Removed redundant clamp (render targets use ClampToEdge automatically) to save GPU cycles
+                    vec4 samp = texture2D(tDiffuse, sampleUV);
                     // Extract brightness - only bright pixels (sky, sun) contribute to rays
                     float lum = dot(samp.rgb, vec3(0.299, 0.587, 0.114));
                     float bright = smoothstep(0.45, 0.85, lum);
-                    illumination += bright * currentDecay * uWeight;
-                    currentDecay *= uDecay;
+                    illumination += bright * currentWeight;
+                    currentWeight *= uDecay;
                 }
                 
                 // Fade out rays near screen edges and when sun is off-screen

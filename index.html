@@ -113,7 +113,7 @@ console.error = function(...args) {
       <button id="close-map-btn" style="background: rgba(255,255,255,0.15); border: none; color: #ff6666; font-family: monospace; font-size: 13px; font-weight: bold; cursor: pointer; padding: 2px 7px; border-radius: 4px; line-height: 1;" title="Hide Map">✖</button>
     </div>
     <canvas id="map-canvas" width="350" height="60" style="display: block; border-radius: 8px; margin: 0 auto; border: 1px solid rgba(255,255,255,0.35);"></canvas>
-    <div id="map-info-text" style="color: #ffffff; font-family: monospace; font-size: 11px; margin-top: 8px; opacity: 0.95; text-align: center; font-weight: bold;">Z: 0m / 72,000m</div>
+    <div id="map-info-text" style="color: #ffffff; font-family: monospace; font-size: 11px; margin-top: 8px; opacity: 0.95; text-align: center; font-weight: bold;">Z: 0m / 54,000m</div>
   </div>
 
   
@@ -446,7 +446,8 @@ initMapUI();
                 const curZoneIdx = _zoneIdxAt(pz);
                 const curZone = ZONES[curZoneIdx];
                 const pzVal = Math.round(playerGrp.position.z);
-                mapInfoEl.innerText = `${curZone.name} | Z:${pzVal}m / 72k`;
+                const totalK = Math.round(WORLD_LENGTH / 1000);
+                mapInfoEl.innerText = `${curZone.name} | Z:${pzVal}m / ${totalK}k`;
             }
         }
     }

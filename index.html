@@ -346,18 +346,30 @@ let isInitializingGui = true;
     let _mapVisible = true;
 
     function initMapUI() {
-        _mapEl = document.getElementById('world-map');
-        _mapCanvas = document.getElementById('map-canvas');
-        if (_mapCanvas) _mapCtx = _mapCanvas.getContext('2d');
-
-        const mapBtn = document.getElementById('map-toggle');
-        if (mapBtn) {
-            mapBtn.addEventListener('click', () => {
-                _mapVisible = !_mapVisible;
-                if (_mapEl) _mapEl.style.display = _mapVisible ? 'block' : 'none';
-            });
-        }
+    _mapEl = document.getElementById('world-map');
+    _mapCanvas = document.getElementById('map-canvas');
+    if (_mapCanvas) {
+        _mapCtx = _mapCanvas.getContext('2d');
+        _mapCanvas.style.cursor = 'pointer';
+        _mapCanvas.addEventListener('click', (e) => {
+            const rect = _mapCanvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const ratio = x / rect.width;
+            const targetZ = ratio * WORLD_LENGTH;
+            const zn = ZONES.find(z => targetZ >= z.start && targetZ <= z.end);
+            if (zn && typeof playerGrp !== 'undefined') {
+                playerGrp.position.set(0, 80, (zn.start + zn.end) * 0.5);
+                if (typeof lastTerrainGridX !== 'undefined') lastTerrainGridX = -9999;
+                if (typeof lastTerrainGridZ !== 'undefined') lastTerrainGridZ = -9999;
+                if (typeof navParams !== 'undefined' && typeof navFolder !== 'undefined') {
+                    navParams.biome = zn.name;
+                    navFolder.controllersRecursive().forEach(c => c.updateDisplay());
+                }
+            }
+        });
     }
+}
+initMapUI();
 
     const _mapColors = {
         '🌊 Archipelago':       '#2a6aad',

@@ -2882,7 +2882,7 @@ initMapUI();
     let envConfigs = [
         {bg: 0x8cbce6, fog: 0x8cbce6, amb: 0xdcf2ff, dir: 0xfffaeb, ambI: 0.9, dirI: 2.5, starOp: 0, sunY: 1500, moonY: -1500, glintCol: 0xfff0d0, cloudCol: 0xfffaec}, // Day
         {bg: 0xffa07a, fog: 0xffa07a, amb: 0xffdab9, dir: 0xffaa00, ambI: 1.1, dirI: 3.2, starOp: 0, sunY: 160, moonY: 200, glintCol: 0xffaa00, cloudCol: 0xffc090}, // Dusk (lower sun)
-        {bg: 0x162d5a, fog: 0x1e4480, amb: 0x666699, dir: 0xffaa00, ambI: 0.9, dirI: 2.2, starOp: 1.0, sunY: -8000, moonY: 1600, glintCol: 0xffa500, cloudCol: 0x253b66}, // Twilight (Vibrant deep blue sky + Moon + Warm Kiki Glow)
+        {bg: 0x162d5a, fog: 0x224888, amb: 0x7788bb, dir: 0xffbb55, ambI: 1.5, dirI: 3.5, starOp: 1.0, sunY: -8000, moonY: 1600, glintCol: 0xffaa44, cloudCol: 0x2e4a80}, // Twilight / Night (Bright Moonlight & Warm Kiki Glow)
     ];
     let currentSunY = 1500;
     let currentMoonY = -1500;
@@ -3639,6 +3639,26 @@ initMapUI();
         atmoFolder.add(atmoParams, 'ambI', 0, 3).name('Amb Intensity').onChange(v => envConfigs[timePhase].ambI = v);
         atmoFolder.add(atmoParams, 'dirI', 0, 5).name('Sun Intensity').onChange(v => envConfigs[timePhase].dirI = v);
         atmoFolder.addColor(atmoParams, 'glintCol').name('Water Glint').onChange(v => envConfigs[timePhase].glintCol = parseInt(v.replace('#',''), 16));
+        
+        // 🌙 Dedicated Moonlight & Night Editor
+        const moonParams = {
+            moonlightColor: '#' + envConfigs[2].dir.toString(16).padStart(6, '0'),
+            moonlightIntensity: envConfigs[2].dirI,
+            nightAmbColor: '#' + envConfigs[2].amb.toString(16).padStart(6, '0'),
+            nightAmbIntensity: envConfigs[2].ambI,
+            nightSkyColor: '#' + envConfigs[2].bg.toString(16).padStart(6, '0'),
+            nightFogColor: '#' + envConfigs[2].fog.toString(16).padStart(6, '0'),
+            moonAltitude: envConfigs[2].moonY
+        };
+
+        const moonFolder = gui.addFolder('🌙 Moonlight & Night');
+        moonFolder.addColor(moonParams, 'moonlightColor').name('Moonlight Color').onChange(v => envConfigs[2].dir = parseInt(v.replace('#',''), 16));
+        moonFolder.add(moonParams, 'moonlightIntensity', 0, 10, 0.1).name('Moonlight Power').onChange(v => envConfigs[2].dirI = v);
+        moonFolder.addColor(moonParams, 'nightAmbColor').name('Night Fill Color').onChange(v => envConfigs[2].amb = parseInt(v.replace('#',''), 16));
+        moonFolder.add(moonParams, 'nightAmbIntensity', 0, 5, 0.1).name('Night Fill Power').onChange(v => envConfigs[2].ambI = v);
+        moonFolder.addColor(moonParams, 'nightSkyColor').name('Night Sky Color').onChange(v => envConfigs[2].bg = parseInt(v.replace('#',''), 16));
+        moonFolder.addColor(moonParams, 'nightFogColor').name('Night Fog Color').onChange(v => envConfigs[2].fog = parseInt(v.replace('#',''), 16));
+        moonFolder.add(moonParams, 'moonAltitude', 200, 4000, 50).name('Moon Altitude').onChange(v => envConfigs[2].moonY = v);
         
         // Cloud Editor
         const cloudParams = {

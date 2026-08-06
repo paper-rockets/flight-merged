@@ -202,6 +202,7 @@ import terrainPlains from './terrain-plains.js';
 import terrainMtn from './terrain-mountains.js';
 import terrainCrystal from './terrain-crystal.js';
 import terrainMtn2 from './terrain-mountains2.js';
+import terrainJungle from './terrain-jungle.js';
 
     import * as THREE from 'three';
     import { initTerrainEditor } from './TerrainEditor.js';
@@ -275,15 +276,13 @@ let isInitializingGui = true;
 
 
     const ZONES = [
-        { start:     0, end:  8000, module: terrainArch,     treesOk: true,  name: '🌊 Archipelago',        archT: (t) => t * 2.0 },
-        { start:  8000, end: 16000, module: terrainGhibli,   treesOk: true,  name: '🌳 Ghibli Land'         },
-        { start: 16000, end: 22000, module: terrainPlains,   treesOk: false, name: '🌾 Golden Plains'        },
-        { start: 22000, end: 34000, module: terrainMtn,      treesOk: false, name: '🏔️ Misty Mountains I'   },
-        { start: 34000, end: 52000, module: terrainCrystal,  treesOk: false, name: '💎 Crystal Land'         },
-        { start: 52000, end: 64000, module: terrainMtn2,     treesOk: false, name: '🏔️ Misty Mountains II'  },
-        { start: 64000, end: 72000, module: terrainGhibli,   treesOk: true,  name: '🌳 Ghibli Land II'       },
+        { start:     0, end:  6000, module: terrainMtn,      treesOk: false, name: '🏔️ Misty Mountains I'   },
+        { start:  6000, end: 18000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle I'        },
+        { start: 18000, end: 36000, module: terrainCrystal,  treesOk: false, name: '💎 Crystal Land'         },
+        { start: 36000, end: 48000, module: terrainJungle,   treesOk: true,  name: '🌴 Lush Jungle II'       },
+        { start: 48000, end: 54000, module: terrainMtn2,     treesOk: false, name: '🏔️ Misty Mountains II'  },
     ];
-    const WORLD_LENGTH = 72000;
+    const WORLD_LENGTH = 54000;
     const BLEND_WIDTH  = 600;
     const blendColor1  = new THREE.Color();
     const blendColor2  = new THREE.Color();
@@ -385,13 +384,11 @@ let isInitializingGui = true;
 initMapUI();
 
     const _mapColors = {
-        '🌊 Archipelago':       '#2a6aad',
-        '🌳 Ghibli Land':       '#4a9640',
-        '🌾 Golden Plains':     '#c8a832',
-        '🏔️ Misty Mountains I': '#6b7280',
-        '💎 Crystal Land':      '#5b8fa8',
-        '🏔️ Misty Mountains II':'#6b7280',
-        '🌳 Ghibli Land II':    '#4a9640',
+        '🏔️ Misty Mountains I':  '#6b7280',
+        '🌴 Lush Jungle I':      '#286330',
+        '💎 Crystal Land':        '#5b8fa8',
+        '🌴 Lush Jungle II':     '#286330',
+        '🏔️ Misty Mountains II': '#6b7280',
     };
 
     function _drawWorldMap() {
@@ -2936,9 +2933,9 @@ initMapUI();
             }
         }
 
-        // Floating Crystals — respawn in Crystal Land (Z: 34,000 to 52,000)
+        // Floating Crystals — respawn in Crystal Land (Z: 18,000 to 36,000)
         const crystalDist = 2400;
-        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 32000 && wz <= 54000; })();
+        const inCrystalLand = typeof playerGrp !== 'undefined' && (function(){ const wz = _wrapZ(playerGrp.position.z); return wz >= 16000 && wz <= 38000; })();
         
         if (typeof matCrystal !== 'undefined' && matCrystal.userData.shader) {
             matCrystal.userData.shader.uniforms.uTime.value = time;
@@ -2953,7 +2950,7 @@ initMapUI();
                 let dx = (Math.random() - 0.5) * crystalDist * 2.0;
                 let dz = (Math.random() - 0.5) * crystalDist * 2.0;
                 const cX = playerGrp.position.x + dx;
-                const cZ = Math.max(34500, Math.min(51500, playerGrp.position.z + dz));
+                const cZ = Math.max(18500, Math.min(35500, playerGrp.position.z + dz));
                 const cGroundY = getWorldHeight(cX, cZ);
                 
                 let spawnY = cGroundY + 200 + Math.random() * 200;

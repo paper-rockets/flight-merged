@@ -161,7 +161,7 @@ console.error = function(...args) {
       <label style="font-size:12px; display:block; margin-bottom:4px;">Night Glow <input type="range" id="c-nightGlow" min="0" max="5" step="0.1" value="1.5" style="width:100%; box-sizing:border-box; display:block;"></label>
       <label style="font-size:12px; display:block; margin-bottom:4px;">Roughness <input type="range" id="c-roughness" min="0" max="1" step="0.05" value="0.08" style="width:100%; box-sizing:border-box; display:block;"></label>
       <label style="font-size:12px; display:block; margin-bottom:4px;">Metalness <input type="range" id="c-metalness" min="0" max="1" step="0.05" value="0.15" style="width:100%; box-sizing:border-box; display:block;"></label>
-      <label style="font-size:12px; display:block; margin-bottom:4px;">Transmission <input type="range" id="c-transmission" min="0" max="1" step="0.05" value="1.0" style="width:100%; box-sizing:border-box; display:block;"></label>
+      <label style="font-size:12px; display:block; margin-bottom:4px;">Transmission <input type="range" id="c-transmission" min="0" max="1" step="0.05" value="0.0" style="width:100%; box-sizing:border-box; display:block;"></label>
       <label style="font-size:12px; display:block; margin-bottom:4px;">Thickness <input type="range" id="c-thickness" min="0" max="20" step="0.5" value="10.0" style="width:100%; box-sizing:border-box; display:block;"></label>
     </div>
     <div style="margin-bottom: 5px;">
@@ -874,7 +874,7 @@ initMapUI();
         metalness: 0.15,
         transparent: true,
         opacity: 0.82,
-        transmission: 1.0,
+        transmission: 0.0,
         thickness: 10.0,
         ior: 2.2,
         clearcoat: 1.0,

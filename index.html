@@ -777,7 +777,7 @@ import terrainMtn2 from './terrain-mountains2.js';
     // ==========================================
     // GIANT FLOATING CRYSTALS (Instanced)
     // ==========================================
-    const CRYSTAL_COUNT = 10;
+    const CRYSTAL_COUNT = 40;
     const geoCrystal = new THREE.OctahedronGeometry(1, 1).toNonIndexed();
     geoCrystal.scale(1, 3, 1);
     geoCrystal.computeVertexNormals();
@@ -828,8 +828,13 @@ import terrainMtn2 from './terrain-mountains2.js';
         ).replace(
             '#include <worldpos_vertex>',
             `#include <worldpos_vertex>
-             vWorldPosC = (modelMatrix * vec4(transformed, 1.0)).xyz;
-             vWorldNormalC = normalize((modelMatrix * vec4(normal, 0.0)).xyz);`
+             #if defined( USE_INSTANCING )
+                 vWorldPosC = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+                 vWorldNormalC = normalize((modelMatrix * instanceMatrix * vec4(normal, 0.0)).xyz);
+             #else
+                 vWorldPosC = (modelMatrix * vec4(transformed, 1.0)).xyz;
+                 vWorldNormalC = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+             #endif`
         );
 
         shader.fragmentShader = `

@@ -22,34 +22,33 @@
     
     #joystick-base {
       position: absolute; left: 40px; bottom: 40px;
-      width: 100px; height: 100px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+      width: 150px; height: 150px; border-radius: 50%;
+      background: radial-gradient(circle at center,
+        rgba(255,255,255,0.08) 0%,
+        rgba(255,255,255,0.12) 58%,
+        rgba(255,165,0,0.18) 60%,
+        rgba(255,165,0,0.10) 100%
+      );
+      border: 1px solid rgba(255,255,255,0.2);
       pointer-events: auto;
     }
-    
+
     #joystick-knob {
       position: absolute; left: 50%; top: 50%;
-      width: 40px; height: 40px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.3);
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.35);
       transform: translate(-50%, -50%);
       pointer-events: none;
+      transition: background 0.1s, box-shadow 0.1s;
     }
 
-    #boost-btn {
-      position: fixed; right: 20px; bottom: 25px;
-      width: 75px; height: 75px; border-radius: 50%;
-      color: white; font-weight: bold; font-size: 14px;
-      display: flex; align-items: center; justify-content: center;
-      user-select: none; pointer-events: auto;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-      backdrop-filter: blur(4px);
-      background: rgba(59, 130, 246, 0.75); border: 2px solid rgba(96, 165, 250, 0.9);
-      transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 20;
+    #joystick-knob.boost {
+      background: rgba(255, 165, 0, 0.75);
+      box-shadow: 0 0 14px rgba(255, 165, 0, 0.8);
     }
 
     #zoom-toggle {
-      position: fixed; right: 20px; bottom: 115px;
+      position: fixed; right: 20px; bottom: 20px;
       width: 75px; height: 40px; border-radius: 20px;
       color: white; font-weight: bold; font-size: 13px;
       display: flex; align-items: center; justify-content: center;
@@ -198,7 +197,6 @@ console.error = function(...args) {
 
   <div id="touch-controls">
     <div id="joystick-base"><div id="joystick-knob"></div></div>
-    <div id="boost-btn">BOOST</div>
     <div id="zoom-toggle">Zoom Out</div>
   </div>
   
@@ -626,8 +624,7 @@ initMapUI();
         gui.domElement.style.display = isVisible ? '' : 'none';
         const mapEl = document.getElementById('world-map');
         if (mapEl) mapEl.style.display = isVisible ? 'block' : 'none';
-        const boostBtn = document.getElementById('boost-btn');
-        if (boostBtn) boostBtn.style.right = isVisible ? '275px' : '20px';
+
         params.showGUI = isVisible;
         params.showMap = isVisible;
     }
@@ -2672,7 +2669,8 @@ initMapUI();
     const joyBase = document.getElementById('joystick-base');
     const joyKnob = document.getElementById('joystick-knob');
     let activeTouchId = null;
-    const maxRadius = 40;
+    const normalRadius = 45;
+    const boostRadius = 70;
 
     joyBase.style.opacity = '0'; // Hide by default
     joyBase.style.pointerEvents = 'none';
@@ -2728,8 +2726,9 @@ initMapUI();
 
     const resetJoystick = () => {
         activeTouchId = null;
-        touchState.x = 0; touchState.y = 0;
+        touchState.x = 0; touchState.y = 0; touchState.boost = false;
         joyKnob.style.transform = `translate(-50%, -50%)`;
+        joyKnob.classList.remove('boost');
         joyBase.style.opacity = '0';
     };
 
@@ -2750,27 +2749,27 @@ initMapUI();
         const rect = joyBase.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
-        let dx = touch.clientX - centerX;
-        let dy = touch.clientY - centerY;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        if(dist > maxRadius) {
-            dx = (dx / dist) * maxRadius;
-            dy = (dy / dist) * maxRadius;
-        }
-        joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-        touchState.x = dx / maxRadius;
-        touchState.y = dy / maxRadius;
+        const rawDx = touch.clientX - centerX;
+        const rawDy = touch.clientY - centerY;
+        const dist = Math.sqrt(rawDx*rawDx + rawDy*rawDy);
+        const dir = dist > 0 ? { x: rawDx / dist, y: rawDy / dist } : { x: 0, y: 0 };
+
+        // Boost when pushed past normal zone
+        const isBoosting = dist > normalRadius;
+        touchState.boost = isBoosting;
+        isBoosting ? joyKnob.classList.add('boost') : joyKnob.classList.remove('boost');
+
+        // Knob visual: clamp to boostRadius
+        const knobDist = Math.min(dist, boostRadius);
+        joyKnob.style.transform = `translate(calc(-50% + ${dir.x * knobDist}px), calc(-50% + ${dir.y * knobDist}px))`;
+
+        // Direction input maxes out at normalRadius
+        const inputDist = Math.min(dist, normalRadius);
+        touchState.x = dir.x * (inputDist / normalRadius);
+        touchState.y = dir.y * (inputDist / normalRadius);
     }
 
-    const boostBtn = document.getElementById('boost-btn');
-    const startBoost = (e) => { e.preventDefault(); touchState.boost = true; boostBtn.style.transform = 'scale(0.9)'; };
-    const resetBoost = (e) => { e.preventDefault(); touchState.boost = false; boostBtn.style.transform = 'scale(1)'; };
-    boostBtn.addEventListener('touchstart', startBoost);
-    boostBtn.addEventListener('mousedown', startBoost);
-    boostBtn.addEventListener('touchend', resetBoost);
-    boostBtn.addEventListener('touchcancel', resetBoost);
-    boostBtn.addEventListener('mouseup', resetBoost);
-    boostBtn.addEventListener('mouseleave', resetBoost);
+
 
     const zoomBtn = document.getElementById('zoom-toggle');
     zoomBtn.addEventListener('click', () => {

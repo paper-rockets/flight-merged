@@ -639,7 +639,7 @@ import terrainMtn2 from './terrain-mountains2.js';
 
     const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 2.0, 30000); // Extended far plane so 20000-unit sun is visible
     camera.position.set(0, 9, 26);
-    const renderer = new THREE.WebGLRenderer({ antialias: !LOW_GFX, preserveDrawingBuffer: !LOW_GFX, logarithmicDepthBuffer: !LOW_GFX });
+    const renderer = new THREE.WebGLRenderer({ antialias: !LOW_GFX, preserveDrawingBuffer: true, logarithmicDepthBuffer: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(LOW_GFX ? 0.5 : Math.min(window.devicePixelRatio, 1.5));
     

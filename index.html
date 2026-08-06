@@ -2349,6 +2349,15 @@ initMapUI();
     proxyMesh.castShadow = true;
     playerVisuals.add(proxyMesh);
 
+    // Dual Warm Illumination Lights on Both Sides of Kiki
+    const kikiLeftLight = new THREE.PointLight(0xffaa44, 2.5, 300, 1.2);
+    kikiLeftLight.position.set(-35, 15, 10);
+    playerVisuals.add(kikiLeftLight);
+
+    const kikiRightLight = new THREE.PointLight(0xffaa44, 2.5, 300, 1.2);
+    kikiRightLight.position.set(35, 15, 10);
+    playerVisuals.add(kikiRightLight);
+
     // Character Models State
     let currentCharacter = 'kiki';
     let kikiModel = null;
@@ -3663,6 +3672,32 @@ initMapUI();
         moonFolder.addColor(moonParams, 'nightSkyColor').name('Night Sky Color').onChange(v => envConfigs[2].bg = parseInt(v.replace('#',''), 16));
         moonFolder.addColor(moonParams, 'nightFogColor').name('Night Fog Color').onChange(v => envConfigs[2].fog = parseInt(v.replace('#',''), 16));
         moonFolder.add(moonParams, 'moonAltitude', 200, 4000, 50).name('Moon Altitude').onChange(v => envConfigs[2].moonY = v);
+
+        // ✨ Kiki Warm Side Glow Editor
+        const kikiGlowParams = {
+            intensity: 2.5,
+            distance: 300,
+            spread: 35,
+            color: '#ffaa44'
+        };
+        const glowFolder = gui.addFolder('✨ Kiki Warm Side Glow');
+        glowFolder.add(kikiGlowParams, 'intensity', 0, 8, 0.1).name('Glow Power').onChange(v => {
+            kikiLeftLight.intensity = v;
+            kikiRightLight.intensity = v;
+        });
+        glowFolder.add(kikiGlowParams, 'distance', 50, 800, 10).name('Glow Range').onChange(v => {
+            kikiLeftLight.distance = v;
+            kikiRightLight.distance = v;
+        });
+        glowFolder.add(kikiGlowParams, 'spread', 5, 100, 1).name('Side Spread').onChange(v => {
+            kikiLeftLight.position.x = -v;
+            kikiRightLight.position.x = v;
+        });
+        glowFolder.addColor(kikiGlowParams, 'color').name('Glow Color').onChange(v => {
+            const col = new THREE.Color(v);
+            kikiLeftLight.color.copy(col);
+            kikiRightLight.color.copy(col);
+        });
         
         // Cloud Editor
         const cloudParams = {

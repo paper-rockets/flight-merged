@@ -381,27 +381,32 @@ export function initTerrainEditor(scene, camera, renderer, terrainMesh) {
     shortcutsEl.innerHTML = '<b>Keys:</b> G Move · R Rotate · S Scale · D Clone · Del Delete · Ctrl+S Save';
     uiContainer.appendChild(shortcutsEl);
 
-    // --- Toggle Button ---
-    let btnToggleEditor = document.getElementById('editor-toggle');
-    if (!btnToggleEditor) {
-        btnToggleEditor = document.createElement('button');
+    // --- Toggle Button in Settings ---
+    const editorSubmenu = document.getElementById('editor-submenu');
+    if (editorSubmenu) {
+        const btnToggleEditor = document.createElement('button');
         btnToggleEditor.id = 'editor-toggle';
-        btnToggleEditor.innerText = '🛠️ Terrain Editor';
-        btnToggleEditor.style.cssText = 'display:none;';
-        document.body.appendChild(btnToggleEditor);
-    }
+        btnToggleEditor.innerText = 'Terrain Editor';
 
-    btnToggleEditor.addEventListener('click', () => {
-        isEditorVisible = !isEditorVisible;
-        uiContainer.style.display = isEditorVisible ? 'flex' : 'none';
-        btnToggleEditor.innerText = isEditorVisible ? 'Hide Editor' : '🛠️ Terrain Editor';
-        if (isEditorVisible) {
-            enterEditorMode();
-            refreshModelLibrary();
+        const qualityToggle = document.getElementById('quality-toggle');
+        if (qualityToggle && qualityToggle.parentNode === editorSubmenu && qualityToggle.nextSibling) {
+            editorSubmenu.insertBefore(btnToggleEditor, qualityToggle.nextSibling);
         } else {
-            exitEditorMode();
+            editorSubmenu.insertBefore(btnToggleEditor, editorSubmenu.firstChild);
         }
-    });
+
+        btnToggleEditor.addEventListener('click', () => {
+            isEditorVisible = !isEditorVisible;
+            uiContainer.style.display = isEditorVisible ? 'flex' : 'none';
+            btnToggleEditor.innerText = isEditorVisible ? 'Hide Editor' : 'Terrain Editor';
+            if (isEditorVisible) {
+                enterEditorMode();
+                refreshModelLibrary();
+            } else {
+                exitEditorMode();
+            }
+        });
+    }
 
     function updateContextUI() {
         if (transformControl.object) {

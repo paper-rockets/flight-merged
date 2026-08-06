@@ -1924,16 +1924,19 @@ initMapUI();
         if (name.includes('Mountains')) return 'mountains';
         if (name.includes('Plains')) return 'plains';
         if (name.includes('Crystal')) return 'crystal';
-        // Archipelago / Open Ocean share Ghibli's terrain → Ghibli editor
+        if (name.includes('Archipelago')) return 'archipelago';
+        if (name.includes('Open Ocean')) return 'openOcean';
         return 'ghibli';
     }
 
     const biomeTypeMeta = {
-        ghibli:    { label: '🌳 Ghibli / Archipelago', extras: 'ghibli' },
-        jungle:    { label: '🌴 Lush Jungle',          extras: 'jungle' },
-        mountains: { label: '🏔️ Misty Mountains',      extras: 'mountains' },
-        plains:    { label: '🌾 Golden Plains',        extras: 'plains' },
-        crystal:   { label: '💎 Crystal Land',         extras: 'crystal' }
+        archipelago: { label: '🌊 Archipelago',        extras: null },
+        ghibli:      { label: '🌳 Ghibli Land',        extras: 'ghibli' },
+        plains:      { label: '🌾 Golden Plains',      extras: 'plains' },
+        mountains:   { label: '🏔️ Misty Mountains',   extras: 'mountains' },
+        jungle:      { label: '🌴 Lush Jungle',        extras: 'jungle' },
+        crystal:     { label: '💎 Crystal Land',       extras: 'crystal' },
+        openOcean:   { label: '🌊 Open Ocean',         extras: null }
     };
 
     // type -> { zones: [names], modules: [unique modules] }
@@ -2155,11 +2158,28 @@ initMapUI();
     }
 
     const biomePopups = {};
+    function navigateToAndPauseForBiome(typeKey) {
+        const info = biomeTypes[typeKey];
+        if (!info || !info.zones.length) return;
+        const zn = ZONES.find(z => z.name === info.zones[0]);
+        if (!zn) return;
+        playerGrp.position.set(0, 80, (zn.start + zn.end) * 0.5);
+        lastTerrainGridX = -9999;
+        lastTerrainGridZ = -9999;
+        isFlightPaused = true;
+        const pauseBtn = document.getElementById('pause-toggle');
+        if (pauseBtn) pauseBtn.innerText = '▶';
+    }
+
     function toggleBiomeTypePopup(typeKey) {
         if (biomePopups[typeKey]) {
             const el = biomePopups[typeKey].domElement;
-            el.style.display = (el.style.display === 'none') ? '' : 'none';
-            if (el.style.display !== 'none') el.style.zIndex = '10002';
+            const opening = el.style.display === 'none';
+            el.style.display = opening ? '' : 'none';
+            if (opening) {
+                el.style.zIndex = '10002';
+                navigateToAndPauseForBiome(typeKey);
+            }
             return;
         }
         const meta = biomeTypeMeta[typeKey] || { label: typeKey };
@@ -2177,6 +2197,7 @@ initMapUI();
         buildBiomeTypePopup(pg, typeKey);
         pg.add({ closeWin: () => { el.style.display = 'none'; } }, 'closeWin').name('✖ Close Window');
         makeGuiDraggable(pg);
+        navigateToAndPauseForBiome(typeKey);
     }
 
     const popupFolder = gui.addFolder('🪟 Biome Editor Windows');

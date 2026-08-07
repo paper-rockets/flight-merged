@@ -952,6 +952,7 @@ console.error = function(...args) {
   </script>
   <script type="module">
 import terrainArch from './terrain-archipelago.js';
+import terrainOpenOcean from './terrain-openocean.js';
 import terrainGhibli from './terrain-ghibli.js';
 import terrainPlains from './terrain-plains.js';
 import terrainMtn from './terrain-mountains.js';
@@ -1043,7 +1044,7 @@ let isInitializingGui = true;
         { start: 70000, end: 104000, module: terrainCrystal, treesOk: false, name: '💎 Crystal Land'  },
         { start: 104000, end: 134000, module: terrainMtn2,    treesOk: false, name: '🏔️ Misty Mountains II'  },
         { start: 134000, end: 198000, module: terrainGhibli,  treesOk: true,  name: '🌳 Ghibli Land II' },
-        { start: 198000, end: 214000, module: terrainArch,    treesOk: false, name: '🌊 Open Ocean'    },
+        { start: 198000, end: 214000, module: terrainOpenOcean, treesOk: false, name: '🌊 Open Ocean'    },
     ];
     const WORLD_LENGTH = 214000;
     const BLEND_WIDTH  = 600;
@@ -1336,7 +1337,9 @@ initMapUI();
         const btn = document.getElementById('editor-toggle');
         if (btn) btn.click();
     }}, 'openTerrainEditor').name('🔧 Terrain Editor');
-    let waterEditorGui = null;
+    let guiWaves = null, guiAtmo = null, guiView = null;
+    let waterEditorUIs = [];
+
     const uniformToBiomeKey = {
         uSea: 'waterSeaState', uWaveHeight: 'waterWaveHeight', uOceanScale: 'waterOceanScale',
         uSwellWavelength: 'waterSwellWavelength', uWaveSpeed: 'waterWaveSpeed',
@@ -1347,8 +1350,8 @@ initMapUI();
     const biomeKeyToUniform = Object.fromEntries(Object.entries(uniformToBiomeKey).map(([u, b]) => [b, u]));
 
     const getU = () => currentWaterState ? currentWaterState.uniforms : null;
-    function buildWaterControls(wavesF, wState) {
-        while (wavesF.controllers.length > 0) wavesF.controllers[0].destroy();
+    function buildWaterControls(folder, wState) {
+        while (folder.controllers.length > 0) folder.controllers[0].destroy();
         const eff = biomeSettingsMgr.getEffective(wState.editingBiome);
         const setU = (biomeKey, uName, val) => {
             const u = getU();
@@ -1370,60 +1373,64 @@ initMapUI();
             waterWindDir: eff.waterWindDir ?? 45,
             waterDirSpread: eff.waterDirSpread ?? 0.45
         };
-        wavesF.add(wp, 'waterSeaState', 0, 1, 0.01).name('Sea State').onChange(v => setU('waterSeaState', 'uSea', v));
-        wavesF.add(wp, 'waterWaveHeight', 0, 3, 0.01).name('Wave Height').onChange(v => setU('waterWaveHeight', 'uWaveHeight', v));
-        wavesF.add(wp, 'waterOceanScale', 0.5, 3, 0.01).name('Ocean Scale').onChange(v => setU('waterOceanScale', 'uOceanScale', v));
-        wavesF.add(wp, 'waterSwellWavelength', 0.5, 2.5, 0.01).name('Swell Wavelength').onChange(v => setU('waterSwellWavelength', 'uSwellWavelength', v));
-        wavesF.add(wp, 'waterWaveSpeed', 0.1, 3, 0.01).name('Wave Speed').onChange(v => setU('waterWaveSpeed', 'uWaveSpeed', v));
-        wavesF.add(wp, 'waterFoamAmount', 0, 1, 0.01).name('Foam Coverage').onChange(v => setU('waterFoamAmount', 'uFoamAmount', v));
-        wavesF.add(wp, 'waterOpacity', 0.1, 1, 0.01).name('Water Opacity').onChange(v => setU('waterOpacity', 'uWaterOpacity', v));
-        wavesF.add(wp, 'waterChopPatchiness', 0, 2.5, 0.01).name('Chop Patchiness').onChange(v => setU('waterChopPatchiness', 'uChopPatchiness', v));
-        wavesF.add(wp, 'waterDetailAmount', 0, 2.5, 0.01).name('Turbulence').onChange(v => setU('waterDetailAmount', 'uDetailAmount', v));
-        wavesF.add(wp, 'waterChop', 0, 1, 0.01).name('Choppiness').onChange(v => setU('waterChop', 'uChop', v));
-        wavesF.add(wp, 'waterWindDir', 0, 360, 1).name('Wind Direction').onChange(v => setU('waterWindDir', 'uWindDir', v));
-        wavesF.add(wp, 'waterDirSpread', 0, 1, 0.01).name('Directional Spread').onChange(v => setU('waterDirSpread', 'uDirSpread', v));
+        folder.add(wp, 'waterSeaState', 0, 1, 0.01).name('Sea State').onChange(v => setU('waterSeaState', 'uSea', v));
+        folder.add(wp, 'waterWindDir', 0, 360, 1).name('Wind Direction').onChange(v => setU('waterWindDir', 'uWindDir', v));
+        folder.add(wp, 'waterDirSpread', 0, 1, 0.01).name('Directional Spread').onChange(v => setU('waterDirSpread', 'uDirSpread', v));
+        folder.add(wp, 'waterWaveHeight', 0, 3, 0.01).name('Global Wave Height').onChange(v => setU('waterWaveHeight', 'uWaveHeight', v));
+        folder.add(wp, 'waterOceanScale', 0.5, 3, 0.01).name('Ocean Scale').onChange(v => setU('waterOceanScale', 'uOceanScale', v));
+        folder.add(wp, 'waterSwellWavelength', 0.5, 2.5, 0.01).name('Swell Wavelength').onChange(v => setU('waterSwellWavelength', 'uSwellWavelength', v));
+        folder.add(wp, 'waterWaveSpeed', 0.1, 3, 0.01).name('Wave Speed').onChange(v => setU('waterWaveSpeed', 'uWaveSpeed', v));
+        folder.add(wp, 'waterChop', 0, 1, 0.01).name('Choppiness').onChange(v => setU('waterChop', 'uChop', v));
+        folder.add(wp, 'waterChopPatchiness', 0, 2.5, 0.01).name('Chop Patchiness').onChange(v => setU('waterChopPatchiness', 'uChopPatchiness', v));
+        folder.add(wp, 'waterFoamAmount', 0, 1, 0.01).name('Foam Coverage').onChange(v => setU('waterFoamAmount', 'uFoamAmount', v));
+        folder.add(wp, 'waterOpacity', 0.1, 1, 0.01).name('Water Opacity').onChange(v => setU('waterOpacity', 'uWaterOpacity', v));
+        folder.add(wp, 'waterDetailAmount', 0, 2.5, 0.01).name('Turbulence').onChange(v => setU('waterDetailAmount', 'uDetailAmount', v));
     }
 
-    function toggleWaterEditorPopup() {
-        if (waterEditorGui) {
-            const el = waterEditorGui.domElement;
-            const opening = el.style.display === 'none';
-            el.style.display = opening ? '' : 'none';
-            if (opening) el.style.zIndex = '10002';
-            return;
-        }
-        waterEditorGui = new GUI({ title: '🌊 KIMI SEA Water Editor', width: 340 });
-        const el = waterEditorGui.domElement;
+    function setupGuiEl(gui, leftPos) {
+        const el = gui.domElement;
         el.style.position = 'fixed';
         el.style.right = 'auto';
-        el.style.left = '60px';
+        el.style.left = leftPos + 'px';
         el.style.top = '60px';
         el.style.zIndex = '10002';
         el.style.maxHeight = '86vh';
         el.style.overflowY = 'auto';
+        makeGuiDraggable(gui);
+        waterEditorUIs.push(el);
+    }
+
+    const globalState = {
+        timeOfDay: 55, bloomIntensity: 40, starDensity: 100, 
+        cameraMode: 'orbit', wireframe: false, meshRes: 160,
+        renderDpr: 1.0, perfMode: false
+    };
+
+    function toggleWaterEditorPopup() {
+        if (guiWaves) {
+            const opening = guiWaves.domElement.style.display === 'none';
+            waterEditorUIs.forEach(el => {
+                el.style.display = opening ? '' : 'none';
+                if (opening) el.style.zIndex = '10002';
+            });
+            return;
+        }
+
+        guiWaves = new GUI({ title: '🌊 Waves & Spectrum', width: 340 });
+        guiAtmo = new GUI({ title: '☁️ Atmosphere & Mood', width: 340 });
+        guiView = new GUI({ title: '📷 View & Presets', width: 340 });
+
+        setupGuiEl(guiWaves, 60);
+        setupGuiEl(guiAtmo, 410);
+        setupGuiEl(guiView, 760);
 
         const biomeNames = ['🌊 Archipelago','🌳 Ghibli Land','🌾 Golden Plains','🏔️ Misty Mountains I','🌴 Lush Jungle I','💎 Crystal Land','🏔️ Misty Mountains II','🌳 Ghibli Land II','🌊 Open Ocean'];
         const wState = { editingBiome: currentActiveBiomeName || biomeNames[0] };
 
-        const shaderState = { mode: params.waterMode || 'realistic' };
-        waterEditorGui.add(shaderState, 'mode', ['realistic', 'toon', 'default'])
-            .name('🎨 Shader')
-            .onChange(v => {
-                params.waterMode = v;
-                biomeSettingsMgr.setOverride(currentActiveBiomeName || 'All Biomes (Default)', 'waterMode', v);
-                const result = switchWaterMode(v, scene, currentWaterState.mesh, camera);
-                currentWaterState = result;
-                waterMesh = result.mesh;
-                if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName);
-                if (typeof buildPresetsFolder === 'function') buildPresetsFolder(v);
-            });
+        // 1. WAVES
+        buildWaterControls(guiWaves, wState);
 
-        const wavesF = waterEditorGui.addFolder('Waves');
-        wavesF.open();
-
-        buildWaterControls(wavesF, wState);
-
-        const specF = waterEditorGui.addFolder('Spectrum (10 Waves)');
+        const specF = guiWaves.addFolder('Spectrum (10 Waves)');
         const specComps = [];
         const specApply = [];
         const specCtrls = [];
@@ -1447,7 +1454,48 @@ initMapUI();
             specCtrls.push(wf.add(comp, 'direction', 0, 360, 1).name('Direction').onChange(updateComp));
         }
 
-        const colorsF = waterEditorGui.addFolder('Colors');
+        guiWaves.add({ rand: () => {
+            const numWaves = 10;
+            for (let i = 0; i < numWaves; i++) {
+                const angle = (Math.random() * 0.9 - 0.45) + (i % 2 === 0 ? 0 : Math.PI * 0.62);
+                const wavelength = 82.0 * Math.pow(0.58, i) * (0.85 + Math.random() * 0.35);
+                const steepness = 0.12 * Math.pow(0.74, i) * (0.8 + Math.random() * 0.4);
+                
+                specComps[i].wavelength = Math.max(wavelength, 1.2);
+                specComps[i].steepness = Math.max(steepness * 1000, 8); 
+                specComps[i].direction = (angle * 180 / Math.PI + 360) % 360;
+                specApply[i]();
+            }
+            specCtrls.forEach(c => c.updateDisplay());
+        }}, 'rand').name('🎲 Randomize Spectrum');
+
+        // 2. ATMOSPHERE
+        const updateAtmosphere = () => {
+            const u = getU();
+            window.waterEditorBloomOverride = true;
+            window.waterEditorSunOverride = true;
+            if (typeof bloomPass !== 'undefined') bloomPass.strength = globalState.bloomIntensity / 100;
+            if (!u) return;
+            
+            const t = globalState.timeOfDay / 100.0;
+            if (u.uTimeOfDay) u.uTimeOfDay.value = t;
+            if (u.uBloomIntensity) u.uBloomIntensity.value = globalState.bloomIntensity / 100;
+            if (u.uStarDensity) u.uStarDensity.value = globalState.starDensity / 100;
+            
+            // Calculate Sun position and colors based on timeOfDay (like the source project)
+            const angle = Math.PI * (t * 1.2 - 0.1);
+            const sunDir = new THREE.Vector3(Math.cos(angle)*0.5, Math.sin(angle), -Math.cos(angle)).normalize();
+            if (u.uSunDir) u.uSunDir.value.copy(sunDir);
+            
+            // Optional: Also update the game's actual directional light if present
+            if (typeof dirLight !== 'undefined' && dirLight) {
+                dirLight.position.copy(sunDir).multiplyScalar(500);
+            }
+        };
+        guiAtmo.add(globalState, 'timeOfDay', 0, 100, 1).name('Time of Day').onChange(updateAtmosphere);
+        guiAtmo.add(globalState, 'bloomIntensity', 0, 100, 1).name('Bloom & Sun Glow').onChange(updateAtmosphere);
+        guiAtmo.add(globalState, 'starDensity', 0, 200, 1).name('Starlight Density').onChange(updateAtmosphere);
+
         const colorState = {
             shallowColor: '#0e5257',
             deepColor: '#04171c',
@@ -1456,28 +1504,89 @@ initMapUI();
         const initU = getU();
         if (initU) {
             if (initU.uShallowColor) colorState.shallowColor = '#' + initU.uShallowColor.value.getHexString();
-            else if (initU.uColorNear) colorState.shallowColor = '#' + initU.uColorNear.value.getHexString();
             if (initU.uDeepColor) colorState.deepColor = '#' + initU.uDeepColor.value.getHexString();
-            else if (initU.uColorFar) colorState.deepColor = '#' + initU.uColorFar.value.getHexString();
             if (initU.uFoamColor) colorState.foamColor = '#' + initU.uFoamColor.value.getHexString();
         }
-        colorsF.addColor(colorState, 'shallowColor').name('Shallow').onChange(v => {
+
+        const applyColors = () => {
             const u = getU();
-            if (u && u.uShallowColor) u.uShallowColor.value.set(v);
-            if (u && u.uColorNear) u.uColorNear.value.set(v);
+            if (u && u.uShallowColor) u.uShallowColor.value.set(colorState.shallowColor);
+            if (u && u.uColorNear) u.uColorNear.value.set(colorState.shallowColor);
+            if (u && u.uDeepColor) u.uDeepColor.value.set(colorState.deepColor);
+            if (u && u.uColorFar) u.uColorFar.value.set(colorState.deepColor);
+            if (u && u.uFoamColor) u.uFoamColor.value.set(colorState.foamColor);
+        };
+
+        const colorsF = guiAtmo.addFolder('Custom Colors');
+        colorsF.addColor(colorState, 'shallowColor').name('Shallow').onChange(applyColors);
+        colorsF.addColor(colorState, 'deepColor').name('Deep Sea').onChange(applyColors);
+        colorsF.addColor(colorState, 'foamColor').name('Foam').onChange(applyColors);
+
+        const applyPreset = (shallow, deep) => {
+            colorState.shallowColor = shallow;
+            colorState.deepColor = deep;
+            colorsF.controllers.forEach(c => c.updateDisplay());
+            applyColors();
+        };
+
+        const moodF = guiAtmo.addFolder('Mood Presets');
+        moodF.add({ p: () => applyPreset('#0e5257', '#04171c') }, 'p').name('Deep');
+        moodF.add({ p: () => applyPreset('#1bbdb1', '#083e54') }, 'p').name('Tropical');
+        moodF.add({ p: () => applyPreset('#21c277', '#0f612d') }, 'p').name('Emerald');
+        moodF.add({ p: () => applyPreset('#051121', '#01050a') }, 'p').name('Abyss');
+        moodF.add({ p: () => { applyPreset('#07111f', '#02060d'); globalState.timeOfDay = 85; updateAtmosphere(); guiAtmo.controllers.forEach(c => c.updateDisplay()); } }, 'p').name('Night 🌙');
+
+        // 3. VIEW & PRESETS
+        guiView.add(globalState, 'cameraMode', ['orbit', 'skim', 'satellite']).name('Camera Mode').onChange(m => {
+            if (typeof controls !== 'undefined' && controls) {
+                if (m === 'orbit') {
+                    controls.minDistance = 5;
+                    controls.maxDistance = 1500;
+                    controls.maxPolarAngle = Math.PI / 2 + 0.1;
+                } else if (m === 'skim') {
+                    controls.minDistance = 2;
+                    controls.maxDistance = 100;
+                    controls.maxPolarAngle = Math.PI / 2 - 0.05;
+                } else if (m === 'satellite') {
+                    controls.minDistance = 500;
+                    controls.maxDistance = 5000;
+                    controls.maxPolarAngle = 0.1;
+                }
+            }
         });
-        colorsF.addColor(colorState, 'deepColor').name('Deep Sea').onChange(v => {
-            const u = getU();
-            if (u && u.uDeepColor) u.uDeepColor.value.set(v);
-            if (u && u.uColorFar) u.uColorFar.value.set(v);
+        guiView.add(globalState, 'wireframe').name('Wireframe').onChange(v => {
+            if (typeof waterMesh !== 'undefined' && waterMesh && waterMesh.material) waterMesh.material.wireframe = v;
         });
-        colorsF.addColor(colorState, 'foamColor').name('Foam').onChange(v => {
-            const u = getU();
-            if (u && u.uFoamColor) u.uFoamColor.value.set(v);
+        guiView.add(globalState, 'meshRes', [128, 160, 256, 440]).name('Tessellation Detail').onChange(v => {
+            if (typeof waterMesh !== 'undefined' && waterMesh) {
+                const s = Number(v);
+                waterMesh.geometry.dispose();
+                waterMesh.geometry = new THREE.PlaneGeometry(10000, 10000, s, s);
+                waterMesh.geometry.rotateX(-Math.PI / 2);
+            }
+        });
+        guiView.add(globalState, 'renderDpr', [0.5, 0.75, 1.0, 1.25]).name('Resolution Scale').onChange(v => {
+            if (typeof renderer !== 'undefined' && renderer) renderer.setPixelRatio(Number(v));
+        });
+        guiView.add(globalState, 'perfMode').name('⚡ Performance Mode').onChange(v => {
+            if (v) {
+                globalState.renderDpr = 0.5;
+                globalState.meshRes = 128;
+                if (getU() && getU().uDetailAmount) getU().uDetailAmount.value = 0.25;
+                if (getU() && getU().uBloomIntensity) getU().uBloomIntensity.value = 0.0;
+            } else {
+                globalState.renderDpr = 1.0;
+                globalState.meshRes = 160;
+                if (getU() && getU().uDetailAmount) getU().uDetailAmount.value = 1.0;
+                if (getU() && getU().uBloomIntensity) getU().uBloomIntensity.value = 0.4;
+            }
+            guiView.controllers.forEach(c=>c.updateDisplay());
+            if(guiAtmo) guiAtmo.controllers.forEach(c=>c.updateDisplay());
+            if (typeof renderer !== 'undefined' && renderer) renderer.setPixelRatio(Number(globalState.renderDpr));
+            updateAtmosphere();
         });
 
-        // ── Presets (4 slots per shader type, persistent) ─────────────────────
-        const WATER_PRESETS_KEY = 'waterShaderPresets_v1';
+        const WATER_PRESETS_KEY = 'waterShaderPresets_v2';
         const loadPresets = () => { try { return JSON.parse(localStorage.getItem(WATER_PRESETS_KEY)) || {}; } catch { return {}; } };
         const savePresets = (p) => localStorage.setItem(WATER_PRESETS_KEY, JSON.stringify(p));
 
@@ -1490,67 +1599,50 @@ initMapUI();
                 seaState:        eff.waterSeaState        ?? (u && u.uSea           ? u.uSea.value           : 0.57),
                 waveHeight:      eff.waterWaveHeight       ?? (u && u.uWaveHeight    ? u.uWaveHeight.value    : 1.0),
                 oceanScale:      eff.waterOceanScale       ?? (u && u.uOceanScale    ? u.uOceanScale.value    : 1.0),
-                swellWavelength: eff.waterSwellWavelength  ?? 1.0,
+                swellWavelength: eff.waterSwellWavelength  ?? (u && u.uSwellWavelength ? u.uSwellWavelength.value : 1.0),
                 waveSpeed:       eff.waterWaveSpeed        ?? (u && u.uWaveSpeed     ? u.uWaveSpeed.value     : 1.0),
-                foamAmount:      eff.waterFoamAmount       ?? 1.0,
-                waterOpacity:    eff.waterOpacity          ?? 0.85,
-                chopPatchiness:  eff.waterChopPatchiness   ?? 1.0,
-                detailAmount:    eff.waterDetailAmount     ?? 1.0,
-                chop:            eff.waterChop             ?? 0.5,
-                windDir:         eff.waterWindDir          ?? 45,
-                dirSpread:       eff.waterDirSpread        ?? 0.45,
-                shallowColor: colorState.shallowColor,
-                deepColor:    colorState.deepColor,
-                foamColor:    colorState.foamColor,
-                spectrum: specComps.map(c => ({ wavelength: c.wavelength, steepness: c.steepness, direction: c.direction }))
+                foamAmount:      eff.waterFoamAmount       ?? (u && u.uFoamAmount    ? u.uFoamAmount.value    : 1.0),
+                waterOpacity:    eff.waterOpacity          ?? (u && u.uWaterOpacity  ? u.uWaterOpacity.value  : 0.85),
+                chopPatchiness:  eff.waterChopPatchiness   ?? (u && u.uChopPatchiness? u.uChopPatchiness.value: 1.0),
+                detailAmount:    eff.waterDetailAmount     ?? (u && u.uDetailAmount  ? u.uDetailAmount.value  : 1.0),
+                chop:            eff.waterChop             ?? (u && u.uChop          ? u.uChop.value          : 0.5),
+                windDir:         eff.waterWindDir          ?? (u && u.uWindDir       ? u.uWindDir.value       : 45),
+                dirSpread:       eff.waterDirSpread        ?? (u && u.uDirSpread     ? u.uDirSpread.value     : 0.45),
+                shallowColor:    colorState.shallowColor,
+                deepColor:       colorState.deepColor,
+                foamColor:       colorState.foamColor,
+                timeOfDay:       globalState.timeOfDay,
+                bloomIntensity:  globalState.bloomIntensity,
+                starDensity:     globalState.starDensity,
+                spectrum:        specComps.map(c => ({...c}))
             };
         };
 
         const applyWaterSnapshot = (snap) => {
             if (!snap) return;
             const biome = currentActiveBiomeName || 'All Biomes (Default)';
-            // Switch shader if needed
-            if (snap.mode && snap.mode !== currentWaterState.mode) {
-                shaderState.mode = snap.mode;
-                params.waterMode = snap.mode;
-                biomeSettingsMgr.setOverride(biome, 'waterMode', snap.mode);
-                const result = switchWaterMode(snap.mode, scene, currentWaterState.mesh, camera);
-                currentWaterState = result;
-                waterMesh = result.mesh;
-                if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName);
-            }
-            // Wave params
-            const mapB = [
-                ['seaState','waterSeaState','uSea'], ['waveHeight','waterWaveHeight','uWaveHeight'],
-                ['oceanScale','waterOceanScale','uOceanScale'], ['swellWavelength','waterSwellWavelength','uSwellWavelength'],
-                ['waveSpeed','waterWaveSpeed','uWaveSpeed'], ['foamAmount','waterFoamAmount','uFoamAmount'],
-                ['waterOpacity','waterOpacity','uWaterOpacity'], ['chopPatchiness','waterChopPatchiness','uChopPatchiness'],
-                ['detailAmount','waterDetailAmount','uDetailAmount'], ['chop','waterChop','uChop'],
-                ['windDir','waterWindDir','uWindDir'], ['dirSpread','waterDirSpread','uDirSpread']
-            ];
-            mapB.forEach(([snapKey, biomeKey, uName]) => {
-                if (snap[snapKey] === undefined) return;
+            Object.keys(uniformToBiomeKey).forEach(uName => {
+                const biomeKey = uniformToBiomeKey[uName];
+                const snapKey = biomeKey.replace('water', '');
+                const finalKey = snapKey.charAt(0).toLowerCase() + snapKey.slice(1);
+                if (snap[finalKey] === undefined) return;
                 const u = getU();
-                if (u && u[uName]) u[uName].value = snap[snapKey];
-                biomeSettingsMgr.setOverride(biome, biomeKey, snap[snapKey]);
+                if (u && u[uName]) u[uName].value = snap[finalKey];
+                biomeSettingsMgr.setOverride(biome, biomeKey, snap[finalKey]);
             });
-            // Colors
             const u = getU();
-            if (snap.shallowColor) {
-                colorState.shallowColor = snap.shallowColor;
-                if (u && u.uShallowColor) u.uShallowColor.value.set(snap.shallowColor);
-                if (u && u.uColorNear) u.uColorNear.value.set(snap.shallowColor);
-            }
-            if (snap.deepColor) {
-                colorState.deepColor = snap.deepColor;
-                if (u && u.uDeepColor) u.uDeepColor.value.set(snap.deepColor);
-                if (u && u.uColorFar) u.uColorFar.value.set(snap.deepColor);
-            }
-            if (snap.foamColor) {
-                colorState.foamColor = snap.foamColor;
-                if (u && u.uFoamColor) u.uFoamColor.value.set(snap.foamColor);
-            }
-            // Spectrum
+            if (snap.shallowColor) colorState.shallowColor = snap.shallowColor;
+            if (snap.deepColor) colorState.deepColor = snap.deepColor;
+            if (snap.foamColor) colorState.foamColor = snap.foamColor;
+            applyColors();
+            if (guiAtmo) guiAtmo.controllers.forEach(c => c.updateDisplay());
+            
+            if (snap.timeOfDay !== undefined) globalState.timeOfDay = snap.timeOfDay;
+            if (snap.bloomIntensity !== undefined) globalState.bloomIntensity = snap.bloomIntensity;
+            if (snap.starDensity !== undefined) globalState.starDensity = snap.starDensity;
+            updateAtmosphere();
+            if (guiAtmo) guiAtmo.controllers.forEach(c=>c.updateDisplay());
+
             if (snap.spectrum && u && u.uW_k) {
                 snap.spectrum.forEach((c, i) => {
                     if (!specComps[i]) return;
@@ -1560,14 +1652,12 @@ initMapUI();
                     specApply[i]();
                 });
             }
-            // Refresh GUI
-            buildWaterControls(wavesF, wState);
-            colorsF.controllers.forEach(c => c.updateDisplay());
+            buildWaterControls(guiWaves, wState);
             specCtrls.forEach(c => c.updateDisplay());
             biomeSettingsMgr.saveNow();
         };
 
-        const presetsF = waterEditorGui.addFolder('💾 Presets');
+        const presetsF = guiView.addFolder('💾 Presets');
         let buildPresetsFolder;
         buildPresetsFolder = (mode) => {
             while (presetsF.folders.length) presetsF.folders[0].destroy();
@@ -1599,10 +1689,11 @@ initMapUI();
                 }
             });
         };
-        buildPresetsFolder(shaderState.mode);
+        buildPresetsFolder('realistic');
 
-        waterEditorGui.add({ closeWin: () => { el.style.display = 'none'; } }, 'closeWin').name('✖ Close Window');
-        makeGuiDraggable(waterEditorGui);
+        guiView.add({ closeWin: () => { 
+            waterEditorUIs.forEach(el => el.style.display = 'none'); 
+        } }, 'closeWin').name('✖ Close Windows');
     }
     editorFolder.add({ openWaterEditor: toggleWaterEditorPopup }, 'openWaterEditor').name('🌊 Water Editor');
 
@@ -1839,7 +1930,9 @@ initMapUI();
                 bloomPass.enabled = !!eff.bloom;
                 if (typeof isBloomOn !== 'undefined') isBloomOn = !!eff.bloom;
             }
-            bloomPass.strength = defaultBloomStrength;
+            if (!window.waterEditorBloomOverride) {
+                bloomPass.strength = defaultBloomStrength;
+            }
         }
 
         // 7. Wind & Trails
@@ -3037,7 +3130,15 @@ initMapUI();
         for (let i = 0; i < pos.count; i++) {
             const worldX = pos.getX(i) + gridX;
             const worldZ = pos.getZ(i) + gridZ;
-            const h = getWorldHeight(worldX, worldZ);
+            let h = getWorldHeight(worldX, worldZ);
+            
+            // Deepen underwater terrain so huge ocean waves don't clip through the floor!
+            // Water level is ~2.4. Any terrain below 2.4 gets pushed much, much lower.
+            if (h < 2.4) {
+                const depthDiff = 2.4 - h;
+                h = 2.4 - (depthDiff * 15.0); // Push terrain down 15x deeper!
+            }
+            
             pos.setY(i, h);
 
             getWorldColor(h, worldX, worldZ, tempColor);
@@ -3046,6 +3147,12 @@ initMapUI();
             const pathMask = getPathStrength(worldX, worldZ);
             if (pathMask > 0 && h > 2.0 && h < 25.0) {
                 tempColor.lerp(colorPath, pathMask * 0.85);
+            }
+            
+            // Underwater sand (water level is ~2.4)
+            const sandBlend = 1.0 - smoothstep(1.8, 3.2, h);
+            if (sandBlend > 0) {
+                tempColor.lerp(colorSand, sandBlend);
             }
 
             colors.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
@@ -3468,16 +3575,9 @@ initMapUI();
              float n2 = 1.0 - abs(snoise(uv * 1.5 - vec2(uTime * 0.15, -uTime * 0.05)));
              float caustics = pow(n1, 6.0) + pow(n2, 6.0) * 0.5;
              
-             // Fade out ripples on inland rivers and small lakes perfectly
-             float simpleTerrainH = snoise(vWorldPos.xz * 0.003) * 15.0;
-             float deepWater = smoothstep(-0.5, -4.0, simpleTerrainH); 
-             
-             caustics = clamp(caustics, 0.0, 1.0) * deepWater;
-             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.95, 1.0), caustics * 0.5);
-             
-             float dist = length(vWorldPos.xz - cameraPosition.xz);
-             float depthFade = smoothstep(50.0, 350.0, dist);
-             diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.2, depthFade);
+             // Keep shimmer and caustics active across ALL water (full ocean and archipelago)
+             caustics = clamp(caustics, 0.0, 1.0);
+             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.95, 1.0), caustics * 0.65);
             `
         );
     };
@@ -5124,7 +5224,7 @@ initMapUI();
                 currentWaterState.uniforms.uCameraPos.value.copy(camera.position);
             }
             if (currentWaterState.mode === 'realistic') {
-                if (currentWaterState.uniforms.uSunDir && dirLight) {
+                if (currentWaterState.uniforms.uSunDir && dirLight && !window.waterEditorSunOverride) {
                     currentWaterState.uniforms.uSunDir.value.copy(dirLight.position).sub(dirLight.target.position).normalize();
                 }
                 if (currentWaterState.uniforms.uSunColor && dirLight) {

@@ -76,20 +76,21 @@ void main() {
     vec3 waveEffect = 1.0 - (smoothstep(threshold + 0.03, threshold + 0.032, colorWaves) + smoothstep(threshold, threshold - 0.01, colorWaves));
     waveEffect = step(0.5, waveEffect);
     vec3 combinedEffect = min(waveEffect + foam, 1.0);
-    float distToCamera = length(vWaterWorldPos.xz - uCameraPos.xz);
-    float horizonFade = smoothstep(150.0, 1200.0, distToCamera);
-    vec3 baseColor = mix(finalColor, uColorFar, clamp(horizonFade, 0.0, 1.0));
-    combinedEffect = mix(combinedEffect, vec3(0.0), horizonFade);
-    vec3 foamEffect = mix(foam * uFoamColor, vec3(0.0), horizonFade);
+    vec3 baseColor = mix(finalColor, uColorFar, 0.5);
+    vec3 foamEffect = foam * uFoamColor;
     finalColor = (1.0 - combinedEffect) * baseColor + combinedEffect * uFoamColor;
     float alphaVal = mix(uWaterOpacity * 0.6, uWaterOpacity, length(foamEffect));
-    alphaVal = mix(alphaVal, uWaterOpacity, horizonFade * 0.5);
+    
+    // Fade out alpha at extreme distance to hide the hard geometric mesh edge
+    float distToCamera = length(vWaterWorldPos.xz - uCameraPos.xz);
+    float edgeFade = smoothstep(3000.0, 4800.0, distToCamera);
+    alphaVal *= (1.0 - edgeFade);
     gl_FragColor = vec4(finalColor, alphaVal);
 }
 `;
 
 export function createDefaultWater() {
-    const waterGeo = new THREE.PlaneGeometry(5000, 5000);
+    const waterGeo = new THREE.PlaneGeometry(10000, 10000);
     waterGeo.rotateX(-Math.PI / 2);
 
     const waterUniforms = {
@@ -147,16 +148,9 @@ export function createDefaultWater() {
              float n2 = 1.0 - abs(snoise(uv * 1.5 - vec2(uTime * 0.15, -uTime * 0.05)));
              float caustics = pow(n1, 6.0) + pow(n2, 6.0) * 0.5;
 
-             // Fade out ripples on inland rivers and small lakes perfectly
-             float simpleTerrainH = snoise(vWorldPos.xz * 0.003) * 15.0;
-             float deepWater = smoothstep(-0.5, -4.0, simpleTerrainH); 
-
-             caustics = clamp(caustics, 0.0, 1.0) * deepWater;
-             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.95, 1.0), caustics * 0.5);
-
-             float dist = length(vWorldPos.xz - cameraPosition.xz);
-             float depthFade = smoothstep(50.0, 350.0, dist);
-             diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.2, depthFade);
+             // Keep shimmer and caustics active across ALL water (full ocean and archipelago)
+             caustics = clamp(caustics, 0.0, 1.0);
+             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.95, 1.0), caustics * 0.65);
             `
         );
     };
@@ -176,7 +170,7 @@ export function createDefaultWater() {
 }
 
 export function createToonWater() {
-    const waterGeo = new THREE.PlaneGeometry(5000, 5000, 128, 128);
+    const waterGeo = new THREE.PlaneGeometry(10000, 10000, 128, 128);
     waterGeo.rotateX(-Math.PI / 2);
 
     const waterUniforms = {
@@ -270,6 +264,9 @@ uniform float uChopPatchiness;
 uniform float uFoamAmount;
 uniform float uFoamEnabled;
 uniform float uWaterOpacity;
+uniform float uTimeOfDay;
+uniform float uBloomIntensity;
+uniform float uStarDensity;
 
 uniform vec3 uShallowColor;
 uniform vec3 uDeepColor;
@@ -286,8 +283,9 @@ uniform float uW_k[10];
 uniform float uW_c[10];
 
 vec2 hash2(vec2 p) {
-    vec2 h = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
-    return fract(sin(h) * 43758.5453) * 2.0 - 1.0;
+    uvec2 q = uvec2(ivec2(p)) * uvec2(1597334673U, 3812015801U);
+    q = (q.x ^ q.y) * uvec2(1597334673U, 3812015801U);
+    return vec2(q) * (1.0 / float(0xffffffffU)) * 2.0 - 1.0;
 }
 
 float gradNoise(vec2 p) {
@@ -350,6 +348,43 @@ float calcWaveCrest(vec2 rawXz, float time, float sea) {
     return h;
 }
 
+vec3 hash33(vec3 p) {
+    vec3 q = vec3(
+        dot(p, vec3(127.1, 311.7, 74.7)),
+        dot(p, vec3(269.5, 183.3, 246.1)),
+        dot(p, vec3(113.5, 271.9, 124.6))
+    );
+    return fract(sin(q) * 43758.5453);
+}
+
+vec3 starField(vec3 dir, float time, vec3 sunDir, float starDensity) {
+    float up = max(dir.y, 0.0);
+    float nightFactor = smoothstep(0.12, -0.25, sunDir.y);
+
+    vec3 p3d = normalize(dir) * 280.0;
+    vec3 cell = floor(p3d);
+    vec3 localP = fract(p3d) - 0.5;
+    vec3 rnd = hash33(cell);
+
+    vec3 starOffset = (rnd - 0.5) * 0.8;
+    float dist = length(localP - starOffset);
+
+    float starPoint = smoothstep(0.16, 0.02, dist);
+    float starMagnitude = pow(rnd.z, 7.0) * 2.2 + 0.15;
+
+    float twinkle = sin(rnd.y * 30.0 + time * 2.5) * 0.3 + 0.7;
+
+    float galacticLat = dir.x * 0.5 + dir.y * 0.8 - dir.z * 0.3;
+    float milkyWayMask = smoothstep(0.45, 0.0, abs(galacticLat)) * up;
+    float milkyWayDust = fbm(dir.xy * 4.0 + vec2(12.3, 4.5)) * 0.5 + 0.5;
+    vec3 milkyWayGlow = vec3(0.03, 0.05, 0.11) * milkyWayMask * milkyWayDust * nightFactor;
+
+    vec3 starTint = mix(vec3(0.85, 0.92, 1.0), vec3(1.0, 0.85, 0.6), rnd.x);
+    vec3 stars = starTint * starPoint * starMagnitude * twinkle * up * nightFactor * starDensity;
+
+    return stars + milkyWayGlow;
+}
+
 vec3 skyColor(vec3 rawDir, vec3 sunDir, vec3 sunCol, vec3 horizCol, vec3 zenithCol, vec3 deepCol) {
     vec3 dir = normalize(rawDir);
     float up = clamp(dir.y, -0.15, 1.0);
@@ -360,7 +395,11 @@ vec3 skyColor(vec3 rawDir, vec3 sunDir, vec3 sunCol, vec3 horizCol, vec3 zenithC
 
     float s = max(dot(dir, sunDir), 0.0);
     sky += sunCol * pow(s, 10.0) * 0.18;
-    sky += sunCol * smoothstep(0.9994, 0.9998, s) * 30.0;
+    sky += sunCol * smoothstep(0.9994, 0.9998, s) * 30.0 * (0.2 + uBloomIntensity * 2.0);
+    
+    // Add stars!
+    sky += starField(dir, uTime, sunDir, uStarDensity);
+    
     return sky;
 }
 
@@ -385,8 +424,10 @@ void main() {
     vec3 V = normalize(uCameraPos - P);
     vec3 sunDir = normalize(uSunDir);
 
-    float colorTurbulence = fbm(xz * 0.035 + vec2(uTime * 0.015 * uWaveSpeed, uTime * -0.01 * uWaveSpeed)) * 0.28;
-    vec3 body = mix(uDeepColor, uShallowColor, clamp(crest * 0.25 + 0.48 + colorTurbulence, 0.0, 1.0));
+    // Color body — bias strongly toward deep color; shallow tint only on wave peaks
+    float colorTurbulence = fbm(xz * 0.035 + vec2(uTime * 0.015 * uWaveSpeed, uTime * -0.01 * uWaveSpeed)) * 0.12;
+    float shallowBlend = clamp(crest * 0.08 + 0.18 + colorTurbulence, 0.0, 0.45);
+    vec3 body = mix(uDeepColor, uShallowColor, shallowBlend);
 
     float sss = pow(max(dot(V, sunDir), 0.0), 3.0) * max(crest, 0.0) * 0.18;
     body += mix(uShallowColor, uSunColor, 0.5) * sss;
@@ -395,12 +436,15 @@ void main() {
     R.y = max(R.y, 0.04);
     R = normalize(R);
 
-    float fresnel = 0.02 + 0.98 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
+    // Proper physical fresnel for a deeper water look
+    float NdotV = max(dot(N, V), 0.0);
+    float fresnel = 0.02 + 0.98 * pow(1.0 - NdotV, 5.0);
     vec3 skyCol = skyColor(R, sunDir, uSunColor, uHorizonColor, uZenithColor, uDeepColor);
     vec3 color = mix(body, skyCol, fresnel);
 
     vec3 H = normalize(sunDir + V);
     float glitterNoise = fbm(xz * 2.1 + vec2(uTime * -0.4 * uWaveSpeed, uTime * 0.5 * uWaveSpeed)) * 0.5 + 0.5;
+    // Tight specular highlights like original demo
     float glitter = pow(max(dot(N, H), 0.0), 500.0) * mix(0.4, 3.4, glitterNoise);
     float sheen = pow(max(dot(N, H), 0.0), 48.0) * 0.12;
     color += uSunColor * (glitter + sheen);
@@ -410,15 +454,16 @@ void main() {
 
     color = mix(color, uFoamColor, clamp(foam * 0.85, 0.0, 1.0));
 
+    // Fade out alpha at extreme distance to hide the hard geometric mesh edge
     float camDist = length(uCameraPos - P);
-    color = mix(color, uHorizonColor, smoothstep(150.0, 1200.0, camDist));
+    float edgeFade = smoothstep(3000.0, 4800.0, camDist);
 
-    fragColor = vec4(color, uWaterOpacity);
+    fragColor = vec4(color, uWaterOpacity * (1.0 - edgeFade));
 }
 `;
 
 export function createRealisticWater() {
-    const waterGeo = new THREE.PlaneGeometry(5000, 5000, 128, 128);
+    const waterGeo = new THREE.PlaneGeometry(10000, 10000, 128, 128);
     waterGeo.rotateX(-Math.PI / 2);
 
     const waterUniforms = {
@@ -434,6 +479,9 @@ export function createRealisticWater() {
         uFoamAmount: { value: 1.0 },
         uFoamEnabled: { value: 1.0 },
         uWaterOpacity: { value: 0.85 },
+        uTimeOfDay: { value: 0.55 },
+        uBloomIntensity: { value: 0.4 },
+        uStarDensity: { value: 1.0 },
         uShallowColor: { value: new THREE.Color('#0e5257') },
         uDeepColor: { value: new THREE.Color('#04171c') },
         uFoamColor: { value: new THREE.Color('#ebf5fc') },

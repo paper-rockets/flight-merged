@@ -1346,10 +1346,10 @@ initMapUI();
     };
     const biomeKeyToUniform = Object.fromEntries(Object.entries(uniformToBiomeKey).map(([u, b]) => [b, u]));
 
+    const getU = () => currentWaterState ? currentWaterState.uniforms : null;
     function buildWaterControls(wavesF, wState) {
         while (wavesF.controllers.length > 0) wavesF.controllers[0].destroy();
         const eff = biomeSettingsMgr.getEffective(wState.editingBiome);
-        const getU = () => currentWaterState ? currentWaterState.uniforms : null;
         const setU = (biomeKey, uName, val) => {
             const u = getU();
             if (u && u[uName]) u[uName].value = val;
@@ -1405,14 +1405,28 @@ initMapUI();
         const biomeNames = ['🌊 Archipelago','🌳 Ghibli Land','🌾 Golden Plains','🏔️ Misty Mountains I','🌴 Lush Jungle I','💎 Crystal Land','🏔️ Misty Mountains II','🌳 Ghibli Land II','🌊 Open Ocean'];
         const wState = { editingBiome: currentActiveBiomeName || biomeNames[0] };
 
+        const shaderState = { mode: params.waterMode || 'realistic' };
+        waterEditorGui.add(shaderState, 'mode', ['realistic', 'toon', 'default'])
+            .name('🎨 Shader')
+            .onChange(v => {
+                params.waterMode = v;
+                biomeSettingsMgr.setOverride(currentActiveBiomeName || 'All Biomes (Default)', 'waterMode', v);
+                const result = switchWaterMode(v, scene, currentWaterState.mesh, camera);
+                currentWaterState = result;
+                waterMesh = result.mesh;
+                if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName);
+                if (typeof buildPresetsFolder === 'function') buildPresetsFolder(v);
+            });
+
         const wavesF = waterEditorGui.addFolder('Waves');
         wavesF.open();
 
-        waterEditorGui.add(wState, 'editingBiome', biomeNames).name('Editing For').onChange(() => buildWaterControls(wavesF, wState));
         buildWaterControls(wavesF, wState);
 
         const specF = waterEditorGui.addFolder('Spectrum (10 Waves)');
-        const getU = () => currentWaterState ? currentWaterState.uniforms : null;
+        const specComps = [];
+        const specApply = [];
+        const specCtrls = [];
         for (let i = 0; i < 10; i++) {
             const wf = specF.addFolder('Wave ' + (i + 1));
             const comp = { wavelength: 50, steepness: 50, direction: 0 };
@@ -1426,10 +1440,166 @@ initMapUI();
                 const rad = comp.direction * Math.PI / 180;
                 u.uW_dir.value[i].set(Math.cos(rad), Math.sin(rad));
             };
-            wf.add(comp, 'wavelength', 5, 300, 1).name('Wavelength').onChange(updateComp);
-            wf.add(comp, 'steepness', 0, 200, 1).name('Steepness').onChange(updateComp);
-            wf.add(comp, 'direction', 0, 360, 1).name('Direction').onChange(updateComp);
+            specComps.push(comp);
+            specApply.push(updateComp);
+            specCtrls.push(wf.add(comp, 'wavelength', 5, 300, 1).name('Wavelength').onChange(updateComp));
+            specCtrls.push(wf.add(comp, 'steepness', 0, 200, 1).name('Steepness').onChange(updateComp));
+            specCtrls.push(wf.add(comp, 'direction', 0, 360, 1).name('Direction').onChange(updateComp));
         }
+
+        const colorsF = waterEditorGui.addFolder('Colors');
+        const colorState = {
+            shallowColor: '#0e5257',
+            deepColor: '#04171c',
+            foamColor: '#ebf5fc'
+        };
+        const initU = getU();
+        if (initU) {
+            if (initU.uShallowColor) colorState.shallowColor = '#' + initU.uShallowColor.value.getHexString();
+            else if (initU.uColorNear) colorState.shallowColor = '#' + initU.uColorNear.value.getHexString();
+            if (initU.uDeepColor) colorState.deepColor = '#' + initU.uDeepColor.value.getHexString();
+            else if (initU.uColorFar) colorState.deepColor = '#' + initU.uColorFar.value.getHexString();
+            if (initU.uFoamColor) colorState.foamColor = '#' + initU.uFoamColor.value.getHexString();
+        }
+        colorsF.addColor(colorState, 'shallowColor').name('Shallow').onChange(v => {
+            const u = getU();
+            if (u && u.uShallowColor) u.uShallowColor.value.set(v);
+            if (u && u.uColorNear) u.uColorNear.value.set(v);
+        });
+        colorsF.addColor(colorState, 'deepColor').name('Deep Sea').onChange(v => {
+            const u = getU();
+            if (u && u.uDeepColor) u.uDeepColor.value.set(v);
+            if (u && u.uColorFar) u.uColorFar.value.set(v);
+        });
+        colorsF.addColor(colorState, 'foamColor').name('Foam').onChange(v => {
+            const u = getU();
+            if (u && u.uFoamColor) u.uFoamColor.value.set(v);
+        });
+
+        // ── Presets (4 slots per shader type, persistent) ─────────────────────
+        const WATER_PRESETS_KEY = 'waterShaderPresets_v1';
+        const loadPresets = () => { try { return JSON.parse(localStorage.getItem(WATER_PRESETS_KEY)) || {}; } catch { return {}; } };
+        const savePresets = (p) => localStorage.setItem(WATER_PRESETS_KEY, JSON.stringify(p));
+
+        const snapshotWater = (mode) => {
+            const u = getU();
+            const biome = currentActiveBiomeName || 'All Biomes (Default)';
+            const eff = biomeSettingsMgr.getEffective(biome);
+            return {
+                mode, ts: Date.now(),
+                seaState:        eff.waterSeaState        ?? (u && u.uSea           ? u.uSea.value           : 0.57),
+                waveHeight:      eff.waterWaveHeight       ?? (u && u.uWaveHeight    ? u.uWaveHeight.value    : 1.0),
+                oceanScale:      eff.waterOceanScale       ?? (u && u.uOceanScale    ? u.uOceanScale.value    : 1.0),
+                swellWavelength: eff.waterSwellWavelength  ?? 1.0,
+                waveSpeed:       eff.waterWaveSpeed        ?? (u && u.uWaveSpeed     ? u.uWaveSpeed.value     : 1.0),
+                foamAmount:      eff.waterFoamAmount       ?? 1.0,
+                waterOpacity:    eff.waterOpacity          ?? 0.85,
+                chopPatchiness:  eff.waterChopPatchiness   ?? 1.0,
+                detailAmount:    eff.waterDetailAmount     ?? 1.0,
+                chop:            eff.waterChop             ?? 0.5,
+                windDir:         eff.waterWindDir          ?? 45,
+                dirSpread:       eff.waterDirSpread        ?? 0.45,
+                shallowColor: colorState.shallowColor,
+                deepColor:    colorState.deepColor,
+                foamColor:    colorState.foamColor,
+                spectrum: specComps.map(c => ({ wavelength: c.wavelength, steepness: c.steepness, direction: c.direction }))
+            };
+        };
+
+        const applyWaterSnapshot = (snap) => {
+            if (!snap) return;
+            const biome = currentActiveBiomeName || 'All Biomes (Default)';
+            // Switch shader if needed
+            if (snap.mode && snap.mode !== currentWaterState.mode) {
+                shaderState.mode = snap.mode;
+                params.waterMode = snap.mode;
+                biomeSettingsMgr.setOverride(biome, 'waterMode', snap.mode);
+                const result = switchWaterMode(snap.mode, scene, currentWaterState.mesh, camera);
+                currentWaterState = result;
+                waterMesh = result.mesh;
+                if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName);
+            }
+            // Wave params
+            const mapB = [
+                ['seaState','waterSeaState','uSea'], ['waveHeight','waterWaveHeight','uWaveHeight'],
+                ['oceanScale','waterOceanScale','uOceanScale'], ['swellWavelength','waterSwellWavelength','uSwellWavelength'],
+                ['waveSpeed','waterWaveSpeed','uWaveSpeed'], ['foamAmount','waterFoamAmount','uFoamAmount'],
+                ['waterOpacity','waterOpacity','uWaterOpacity'], ['chopPatchiness','waterChopPatchiness','uChopPatchiness'],
+                ['detailAmount','waterDetailAmount','uDetailAmount'], ['chop','waterChop','uChop'],
+                ['windDir','waterWindDir','uWindDir'], ['dirSpread','waterDirSpread','uDirSpread']
+            ];
+            mapB.forEach(([snapKey, biomeKey, uName]) => {
+                if (snap[snapKey] === undefined) return;
+                const u = getU();
+                if (u && u[uName]) u[uName].value = snap[snapKey];
+                biomeSettingsMgr.setOverride(biome, biomeKey, snap[snapKey]);
+            });
+            // Colors
+            const u = getU();
+            if (snap.shallowColor) {
+                colorState.shallowColor = snap.shallowColor;
+                if (u && u.uShallowColor) u.uShallowColor.value.set(snap.shallowColor);
+                if (u && u.uColorNear) u.uColorNear.value.set(snap.shallowColor);
+            }
+            if (snap.deepColor) {
+                colorState.deepColor = snap.deepColor;
+                if (u && u.uDeepColor) u.uDeepColor.value.set(snap.deepColor);
+                if (u && u.uColorFar) u.uColorFar.value.set(snap.deepColor);
+            }
+            if (snap.foamColor) {
+                colorState.foamColor = snap.foamColor;
+                if (u && u.uFoamColor) u.uFoamColor.value.set(snap.foamColor);
+            }
+            // Spectrum
+            if (snap.spectrum && u && u.uW_k) {
+                snap.spectrum.forEach((c, i) => {
+                    if (!specComps[i]) return;
+                    specComps[i].wavelength = c.wavelength;
+                    specComps[i].steepness  = c.steepness;
+                    specComps[i].direction  = c.direction;
+                    specApply[i]();
+                });
+            }
+            // Refresh GUI
+            buildWaterControls(wavesF, wState);
+            colorsF.controllers.forEach(c => c.updateDisplay());
+            specCtrls.forEach(c => c.updateDisplay());
+            biomeSettingsMgr.saveNow();
+        };
+
+        const presetsF = waterEditorGui.addFolder('💾 Presets');
+        let buildPresetsFolder;
+        buildPresetsFolder = (mode) => {
+            while (presetsF.folders.length) presetsF.folders[0].destroy();
+            const all = loadPresets();
+            if (!all[mode]) all[mode] = [null, null, null, null];
+            all[mode].forEach((slot, i) => {
+                const label = slot
+                    ? `Slot ${i+1}  ·  ${new Date(slot.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                    : `Slot ${i+1}  ·  (empty)`;
+                const sf = presetsF.addFolder(label);
+                sf.add({ save: () => {
+                    const p = loadPresets();
+                    if (!p[mode]) p[mode] = [null, null, null, null];
+                    p[mode][i] = snapshotWater(mode);
+                    savePresets(p);
+                    buildPresetsFolder(mode);
+                }}, 'save').name('💾 Save current');
+                if (slot) {
+                    sf.add({ load: () => {
+                        applyWaterSnapshot(slot);
+                        buildPresetsFolder(mode);
+                    }}, 'load').name('▶ Load');
+                    sf.add({ clear: () => {
+                        const p = loadPresets();
+                        if (p[mode]) p[mode][i] = null;
+                        savePresets(p);
+                        buildPresetsFolder(mode);
+                    }}, 'clear').name('✕ Clear');
+                }
+            });
+        };
+        buildPresetsFolder(shaderState.mode);
 
         waterEditorGui.add({ closeWin: () => { el.style.display = 'none'; } }, 'closeWin').name('✖ Close Window');
         makeGuiDraggable(waterEditorGui);

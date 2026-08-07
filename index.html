@@ -574,6 +574,7 @@ console.error = function(...args) {
   
   <div id="top-bar" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px;">
     <button id="pause-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">⏸</button>
+    <button id="freecam-toggle" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 3px 8px; border-radius: 4px;">🎥 Free Cam</button>
     <div id="fps-counter" style="color: #fff; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none;">0 FPS</div>
     <div id="biome-label" style="color: #ffe066; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; opacity: 0.9;"></div>
     <button id="time-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">☀️</button>
@@ -1047,9 +1048,11 @@ import { createToonWater, createRealisticWater, switchWaterMode } from './WaterS
     let isShadowsOn = !LOW_GFX;
     let isTreeShadowsOn = false;
     let shadowDistMode = LOW_GFX ? 'Close' : 'Med';
-    let isBloomOn = !LOW_GFX;
+    let isBloomOn = false;
     let isHD = !LOW_GFX;
     let cameraZoomDist = 12.0;
+    let isFreeCam = false;
+    let isFogEnabled = true;
     let currentFrame = 0;
     let logicTimer = 0;
     let terrainRes = LOW_GFX ? 64 : 256;
@@ -1288,7 +1291,7 @@ initMapUI();
         treeColor4: '#aaffaa',
         treeColor5: '#bbdd99',
         treeColor6: '#669966',
-        summerFilter: !LOW_GFX,
+        summerFilter: false,
         modelVisible: true,
         wind: isWindOn,
         rain: isRainOn,
@@ -1312,6 +1315,7 @@ initMapUI();
         showCrystals: true,
         showMap: true,
         showGUI: true,
+        showFog: true,
         exposure: 1.8,
     };
 
@@ -1468,6 +1472,7 @@ initMapUI();
     debugFolder.add(params, 'showClouds').name('Clouds').onChange(v => { instClouds.visible = v; if(typeof instHighClouds !== 'undefined') instHighClouds.visible = v; if(typeof instMegaClouds !== 'undefined') instMegaClouds.visible = v; });
     debugFolder.add(params, 'showBirds').name('Birds').onChange(v => { if(typeof instBirds !== 'undefined') instBirds.visible = v; if(typeof flockGrp !== 'undefined') flockGrp.visible = v; });
     debugFolder.add(params, 'showFogPlanes').name('Fog Planes').onChange(v => { if(typeof window.fogGroup !== 'undefined') window.fogGroup.visible = v; });
+    debugFolder.add(params, 'showFog').name('Fog').onChange(v => { isFogEnabled = v; });
     debugFolder.add(params, 'showCrystals').name('Crystals').onChange(v => { instCrystals.visible = v; });
 
 
@@ -1727,6 +1732,7 @@ initMapUI();
     biomeFolder.add(editingState, 'selectedBiome', biomeOptions).name('Editing:').onChange(() => {
         refreshBiomeFolderControllers();
         refreshBiomeExtrasFolder();
+        refreshAtmosphereFolders();
     });
 
     const settingsSubFolder = biomeFolder.addFolder('Settings');
@@ -1734,6 +1740,52 @@ initMapUI();
 
     const biomeExtrasFolder = biomeFolder.addFolder('Biome Extras');
     biomeExtrasFolder.open();
+
+    const skyFolder = biomeFolder.addFolder('🌅 Sky Colors');
+    const fogFolder = biomeFolder.addFolder('🌫️ Overall Fog');
+    const cloudsFolder = biomeFolder.addFolder('☁️ Clouds');
+
+    function refreshAtmosphereFolders() {
+        while (skyFolder.controllers.length > 0) skyFolder.controllers[0].destroy();
+        while (fogFolder.controllers.length > 0) fogFolder.controllers[0].destroy();
+        while (cloudsFolder.controllers.length > 0) cloudsFolder.controllers[0].destroy();
+
+        const effective = biomeSettingsMgr.getEffective(editingState.selectedBiome);
+        const addSky = (ctrl) => { ctrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, ctrl.property, v); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); }); return ctrl; };
+        const addFog = (ctrl) => { ctrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, ctrl.property, v); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); }); return ctrl; };
+        const addCloud = (ctrl) => { ctrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, ctrl.property, v); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); }); return ctrl; };
+
+        // Sky
+        addSky(skyFolder.add(effective, 'overrideSky').name('Override Time of Day'));
+        if (effective.overrideSky) {
+            addSky(skyFolder.addColor(effective, 'skyColorTop').name('Sky Color'));
+            addSky(skyFolder.addColor(effective, 'ambientLightColor').name('Ambient Color'));
+            addSky(skyFolder.add(effective, 'ambientLightIntensity', 0, 3, 0.05).name('Amb Intensity'));
+            addSky(skyFolder.addColor(effective, 'dirLightColor').name('Sun Color'));
+            addSky(skyFolder.add(effective, 'dirLightIntensity', 0, 5, 0.05).name('Sun Intensity'));
+        }
+
+        // Fog
+        addFog(fogFolder.add(effective, 'overrideFog').name('Override Base Fog'));
+        if (effective.overrideFog) {
+            addFog(fogFolder.addColor(effective, 'fogColor').name('Fog Color'));
+            addFog(fogFolder.add(effective, 'fogDensityAtmo', 0.0001, 0.01, 0.0001).name('Overall Fog Density'));
+        }
+
+        // Clouds
+        addCloud(cloudsFolder.add(effective, 'overrideClouds').name('Override Global Clouds'));
+        if (effective.overrideClouds) {
+            addCloud(cloudsFolder.addColor(effective, 'cloudColor0').name('Cloud Base 1'));
+            addCloud(cloudsFolder.addColor(effective, 'cloudColor1').name('Cloud Base 2'));
+            addCloud(cloudsFolder.addColor(effective, 'cloudColor2').name('Cloud Tint 1'));
+            addCloud(cloudsFolder.addColor(effective, 'cloudColor3').name('Cloud Tint 2'));
+            addCloud(cloudsFolder.addColor(effective, 'cloudColor4').name('Cloud Highlight'));
+            addCloud(cloudsFolder.add(effective, 'cloudOpacityBase', 0, 1, 0.05).name('Puff Opacity'));
+            addCloud(cloudsFolder.add(effective, 'cloudOpacityHigh', 0, 1, 0.05).name('High Cloud Opacity'));
+            addCloud(cloudsFolder.add(effective, 'cloudOpacityWispy', 0, 1, 0.05).name('Wispy Opacity'));
+            addCloud(cloudsFolder.add(effective, 'cloudOpacityMega', 0, 1, 0.05).name('Mega Cloud Opacity'));
+        }
+    }
 
     function refreshBiomeFolderControllers() {
         while (settingsSubFolder.controllers.length > 0) {
@@ -1778,6 +1830,14 @@ initMapUI();
             if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName);
             refreshBiomeFolderControllers();
         });
+
+        // Also add listeners to override checkboxes so the UI can redraw dynamically
+        const overrideSkyCtrl = skyFolder.controllers.find(c => c.property === 'overrideSky');
+        if (overrideSkyCtrl) overrideSkyCtrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, 'overrideSky', v); refreshAtmosphereFolders(); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); });
+        const overrideFogCtrl = fogFolder.controllers.find(c => c.property === 'overrideFog');
+        if (overrideFogCtrl) overrideFogCtrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, 'overrideFog', v); refreshAtmosphereFolders(); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); });
+        const overrideCloudsCtrl = cloudsFolder.controllers.find(c => c.property === 'overrideClouds');
+        if (overrideCloudsCtrl) overrideCloudsCtrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, 'overrideClouds', v); refreshAtmosphereFolders(); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); });
 
         if (effective.waterMode === 'default') {
             addCtrl(settingsSubFolder.addColor(effective, 'waterColor').name('Water Color'));
@@ -1864,12 +1924,14 @@ initMapUI();
 
     refreshBiomeFolderControllers();
     refreshBiomeExtrasFolder();
+    refreshAtmosphereFolders();
 
     biomeFolder.add({
         resetThis: () => {
             biomeSettingsMgr.resetBiome(editingState.selectedBiome);
             refreshBiomeFolderControllers();
             refreshBiomeExtrasFolder();
+            refreshAtmosphereFolders();
             if (currentActiveBiomeName) {
                 applyBiomeSettings(currentActiveBiomeName);
             }
@@ -1881,6 +1943,7 @@ initMapUI();
             biomeSettingsMgr.resetAll();
             refreshBiomeFolderControllers();
             refreshBiomeExtrasFolder();
+            refreshAtmosphereFolders();
             if (currentActiveBiomeName) {
                 applyBiomeSettings(currentActiveBiomeName);
             }
@@ -2267,7 +2330,8 @@ initMapUI();
     window.addEventListener('wheel', (e) => {
         if (window.editorState && window.editorState.isEditorMode) return;
         cameraZoomDist += Math.sign(e.deltaY) * 4.0;
-        cameraZoomDist = Math.max(0.5, Math.min(100.0, cameraZoomDist)); // clamp between 0.5 and 100 units
+        let maxZoom = typeof isFreeCam !== 'undefined' && isFreeCam ? 2500.0 : 100.0;
+        cameraZoomDist = Math.max(0.5, Math.min(maxZoom, cameraZoomDist)); // clamp
 
     }, { passive: true });
     
@@ -3142,17 +3206,11 @@ initMapUI();
     }
     geoCloud.computeVertexNormals();
 
-    // Meshes
-    const instTree1 = new THREE.InstancedMesh(geoTree1, matTree, Math.floor(3600 * TREE_MULT));
-    const instTree2 = new THREE.InstancedMesh(geoTree2, matTree, Math.floor(3600 * TREE_MULT));
-    const instTree3 = new THREE.InstancedMesh(geoTree3, matTree, Math.floor(3600 * TREE_MULT));
-    const instTree4 = new THREE.InstancedMesh(geoTree4, matTree, Math.floor(2400 * TREE_MULT));
-    const instOak1 = new THREE.InstancedMesh(geoTree1, matTree, Math.floor(2400 * TREE_MULT));
-    const instOak2 = new THREE.InstancedMesh(geoTree2, matTree, Math.floor(2400 * TREE_MULT));
-    const instOak3 = new THREE.InstancedMesh(geoTree3, matTree, Math.floor(2400 * TREE_MULT));
+    // Meshes — Reduced to 1 Pine and 1 Oak for draw-call optimization (2-3 draw calls total)
+    const instTree1 = new THREE.InstancedMesh(geoTree1, matTree, Math.floor(4000 * TREE_MULT));
+    const instOak1 = new THREE.InstancedMesh(geoTree2, matTree, Math.floor(8000 * TREE_MULT)); // High density for Plains!
+    scene.add(instTree1);
     scene.add(instOak1);
-    scene.add(instOak2);
-    scene.add(instOak3);
     
     let treeGreenVariations = [
         0xffffff, // Normal white
@@ -3164,7 +3222,7 @@ initMapUI();
         0x669966  // Deep forest green
     ];
     const tempTreeColor = new THREE.Color();
-    const treeMeshes = [instTree1, instTree2, instTree3, instTree4, instOak1, instOak2, instOak3];
+    const treeMeshes = [instTree1, instOak1];
     treeMeshes.forEach(mesh => {
         mesh.maxCount = mesh.count;
         for (let i = 0; i < mesh.count; i++) {
@@ -3659,12 +3717,12 @@ initMapUI();
     const dummy = new THREE.Object3D();
 
     const treeGrid = new Set();
-    const TREE_CELL_SIZE = 17; // Increased to reduce overall density by ~20%
+    const TREE_CELL_SIZE = 6; // EXTREMELY dense packing to ensure 8000 trees easily fit randomly!
     function getTreeCell(x, z) {
         return Math.floor(x / TREE_CELL_SIZE) + '_' + Math.floor(z / TREE_CELL_SIZE);
     }
 
-    const treeDist = 900; // Increased distance for trees so they spawn seamlessly in fog
+    const treeDist = 450; // Much closer to the player where the sun rays are most visible
     let isPrewarming = false;
 
     function isTreeZone(worldZ) {
@@ -3801,24 +3859,33 @@ initMapUI();
 
                     while(!valid && attempts < 15) {
                         const spawnAngle = Math.random() * Math.PI * 2;
-                        const spawnR = treeDist * (0.75 + Math.random() * 0.25);
+                        // During pre-warm, spread trees evenly across the entire radius. Otherwise, spawn only at the edge as the player moves.
+                        const spawnR = isPrewarming ? (treeDist * Math.sqrt(Math.random())) : (treeDist * (0.75 + Math.random() * 0.25));
                         nx = playerX + Math.cos(spawnAngle) * spawnR;
                         nz = playerZ + Math.sin(spawnAngle) * spawnR;
                         h = getWorldHeight(nx, nz);
                         pathVal = getPathStrength(nx, nz);
                         cellKey = getTreeCell(nx, nz);
                         
-                        let isClearing = snoise(nx * 0.003, nz * 0.003 + 50) > 0.25;
-
                         const bName = ZONES[_zoneIdxAt(_wrapZ(nz))].name;
                         let biomeMatch = true;
-                        if (bName.includes('Golden Plains')) {
-                            if (meshIdx < 4) biomeMatch = false; // Golden Plains gets Oak trees
+                        let isClearing = false;
+
+                        if (bName.includes('Ghibli')) {
+                            if (meshIdx !== 0) biomeMatch = false; // Ghibli gets ONLY Pines
+                            // Rare clearings for Ghibli (Pines)
+                            isClearing = (snoise(nx * 0.003, nz * 0.003 + 100) > 0.65);
+                        } else if (bName.includes('Golden Plains')) {
+                            if (meshIdx !== 1) biomeMatch = false; // Plains gets ONLY NormalTree_5
+                            // Slightly more clearings for Plains (Oaks)
+                            isClearing = (snoise(nx * 0.004, nz * 0.004 + 50) > 0.55);
                         } else {
-                            if (meshIdx >= 4) biomeMatch = false; // Ghibli Land & Jungle get Pine trees
+                            biomeMatch = false;
                         }
 
-                        if (!isClearing && h > 3.5 && h < 45 && pathVal < 0.1 && isTreeZone(nz) && biomeMatch && (Math.random() > 0.1)) { 
+                        // h > 0.5 ensures trees spawn in valleys and near water without leaving huge empty fields
+                        // pathVal < 0.2 tightens the paths so they aren't massive bare spots
+                        if (!isClearing && h > 0.5 && h < 55 && pathVal < 0.2 && isTreeZone(nz) && biomeMatch && (Math.random() > 0.15)) { 
                             if (!treeGrid.has(cellKey)) {
                                 valid = true;
                             }
@@ -3829,13 +3896,25 @@ initMapUI();
                     if (valid) {
                         treeGrid.add(cellKey);
                         dummy.position.set(nx, h, nz);
-                        treeBirthTimes[meshIdx][i] = performance.now() / 1000.0;
-                        instMesh.geometry.attributes.aBirthTime.needsUpdate = true;
-                        dummy.rotation.set(0, Math.random() * Math.PI * 2.0, 0); // 360 degree rotation variation
+                        if (treeBirthTimes[meshIdx]) treeBirthTimes[meshIdx][i] = performance.now() / 1000.0;
+                        if (instMesh.geometry && instMesh.geometry.attributes && instMesh.geometry.attributes.aBirthTime) {
+                            instMesh.geometry.attributes.aBirthTime.needsUpdate = true;
+                        }
                         
-                        let baseS = 0.75 + Math.random() * 1.1;
+                        // Ground rotation + subtle pitch/roll tilt for fuller organic appearance from afar
+                        const rotY = Math.random() * Math.PI * 2.0;
+                        const tiltX = (Math.random() - 0.5) * 0.22; // ~6.3 deg tilt
+                        const tiltZ = (Math.random() - 0.5) * 0.22;
+                        dummy.rotation.set(tiltX, rotY, tiltZ);
+                        
+                        // Huge base scale increase for massive overlapping canopies (blocks view of grass!)
+                        let baseS = (meshIdx === 1) ? (1.5 + Math.random() * 0.95) : (1.4 + Math.random() * 1.0);
                         dummy.scale.set(baseS * (0.85 + Math.random() * 0.3), baseS * (0.9 + Math.random() * 0.25), baseS * (0.85 + Math.random() * 0.3));
-                        tempTreeColor.setHex(treeGreenVariations[Math.floor(Math.random() * treeGreenVariations.length)]);
+                        if (instMesh._isOakTree) {
+                            tempTreeColor.setHex(0xffffff);
+                        } else {
+                            tempTreeColor.setHex(treeGreenVariations[Math.floor(Math.random() * treeGreenVariations.length)]);
+                        }
                         instMesh.setColorAt(i, tempTreeColor);
                     } else {
                         dummy.position.set(0, -1000, 0); 
@@ -4001,6 +4080,14 @@ initMapUI();
         if (typeof params !== 'undefined') params.modelVisible = isModelVisible;
     });
 
+    document.getElementById('freecam-toggle')?.addEventListener('click', (e) => {
+        isFreeCam = !isFreeCam;
+        e.target.style.background = isFreeCam ? 'rgba(255,200,0,0.5)' : 'rgba(255,255,255,0.25)';
+        if ((isFreeCam && isModelVisible) || (!isFreeCam && !isModelVisible)) {
+            document.getElementById('invis-toggle')?.click(); // Automatically toggle model visibility
+        }
+    });
+
     document.getElementById('char-toggle').addEventListener('click', () => {
         const idx = CHAR_CYCLE.findIndex(c => c.id === currentCharacter);
         const nextIdx = (idx + 1) % CHAR_CYCLE.length;
@@ -4114,22 +4201,150 @@ initMapUI();
         });
     }
 
+    function applyGLBOakTree(gltf, targetInstancedMeshes, targetHeight) {
+        gltf.scene.updateMatrixWorld(true);
+        const childMeshes = [];
+        gltf.scene.traverse((child) => {
+            if (child.isMesh) {
+                const g = child.geometry.clone();
+                g.applyMatrix4(child.matrixWorld);
+                g.computeBoundingBox();
+                g.computeBoundingSphere();
+                childMeshes.push({
+                    mesh: child,
+                    geometry: g,
+                    material: child.material
+                });
+            }
+        });
+        if (childMeshes.length === 0) return;
+
+        const bbox = new THREE.Box3();
+        childMeshes.forEach(item => {
+            bbox.expandByObject(new THREE.Mesh(item.geometry));
+        });
+        const modelHeight = bbox.max.y - bbox.min.y;
+        const sc = modelHeight > 0 ? (targetHeight / modelHeight) : 1.0;
+        const offsetY = -bbox.min.y;
+
+        // Identify bark and leaves by material name
+        let barkItem = null, leavesItem = null;
+        childMeshes.forEach(item => {
+            const name = (item.material && item.material.name) || '';
+            if (name.toLowerCase().includes('leaves') || name.toLowerCase().includes('leaf')) {
+                leavesItem = item;
+            } else {
+                barkItem = item;
+            }
+        });
+        if (!barkItem) barkItem = childMeshes[0];
+        if (!leavesItem) leavesItem = childMeshes[childMeshes.length > 1 ? 1 : 0];
+
+        // --- Bark geometry ---
+        const barkGeo = barkItem.geometry.clone();
+        barkGeo.translate(0, offsetY, 0);
+        barkGeo.scale(sc, sc, sc);
+        const bvc = barkGeo.attributes.position.count;
+        if (!barkGeo.attributes.color) {
+            const bColors = new Float32Array(bvc * 3);
+            const brown = new THREE.Color(0x8B6B4A);
+            for (let i = 0; i < bvc; i++) { bColors[i*3]=brown.r; bColors[i*3+1]=brown.g; bColors[i*3+2]=brown.b; }
+            barkGeo.setAttribute('color', new THREE.BufferAttribute(bColors, 3));
+        }
+        if (!barkGeo.attributes.uv) {
+            const uvs = new Float32Array(bvc * 2);
+            barkGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        }
+        if (!barkGeo.index) {
+            const idx = new Uint32Array(bvc);
+            for (let i = 0; i < bvc; i++) idx[i] = i;
+            barkGeo.setIndex(new THREE.BufferAttribute(idx, 1));
+        }
+
+        // --- Leaves geometry with small natural canopy color variation ---
+        const leavesGeo = leavesItem.geometry.clone();
+        leavesGeo.translate(0, offsetY, 0);
+        leavesGeo.scale(sc, sc, sc);
+        const lvc = leavesGeo.attributes.position.count;
+        const lColors = new Float32Array(lvc * 3);
+        const baseGreen = new THREE.Color(0x4a9b4a);
+        for (let i = 0; i < lvc; i++) {
+            const varR = (Math.random() - 0.5) * 0.12;
+            const varG = (Math.random() - 0.5) * 0.15;
+            const varB = (Math.random() - 0.5) * 0.10;
+            lColors[i * 3]     = Math.max(0, Math.min(1, baseGreen.r + varR));
+            lColors[i * 3 + 1] = Math.max(0, Math.min(1, baseGreen.g + varG));
+            lColors[i * 3 + 2] = Math.max(0, Math.min(1, baseGreen.b + varB));
+        }
+        leavesGeo.setAttribute('color', new THREE.BufferAttribute(lColors, 3));
+        if (!leavesGeo.attributes.uv) {
+            const uvs = new Float32Array(lvc * 2);
+            leavesGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+        }
+        if (!leavesGeo.index) {
+            const idx = new Uint32Array(lvc);
+            for (let i = 0; i < lvc; i++) idx[i] = i;
+            leavesGeo.setIndex(new THREE.BufferAttribute(idx, 1));
+        }
+
+        // Bark material — opaque toon with original texture (if any) + vertex colors
+        const origBarkMat = barkItem.material;
+        const barkMat = new THREE.MeshToonMaterial({
+            map: origBarkMat ? origBarkMat.map : null,
+            vertexColors: true,
+            gradientMap: gradientMap,
+            side: THREE.DoubleSide,
+            dithering: true
+        });
+
+        // Leaves material — toon with original texture (for alpha leaf shapes) + vertex colors
+        const origLeavesMat = leavesItem.material;
+        const leavesMat = new THREE.MeshToonMaterial({
+            map: origLeavesMat ? origLeavesMat.map : null,
+            vertexColors: true,
+            gradientMap: gradientMap,
+            side: THREE.DoubleSide,
+            alphaTest: 0.5,
+            dithering: true
+        });
+
+        targetInstancedMeshes.forEach(instMesh => {
+            // Guarantee aBirthTime attribute exists on geometry
+            let birthAttr = instMesh.geometry.attributes.aBirthTime;
+            if (!birthAttr) {
+                const birthTimeArray = new Float32Array(instMesh.count);
+                birthTimeArray.fill(-10.0); // All trees start fully grown
+                birthAttr = new THREE.InstancedBufferAttribute(birthTimeArray, 1);
+            }
+
+            // Main instanced mesh becomes leaves (most visible part)
+            instMesh.geometry = leavesGeo.clone();
+            instMesh.geometry.setAttribute('aBirthTime', birthAttr);
+            instMesh.material = leavesMat;
+            instMesh.instanceColor = null;
+            instMesh._isOakTree = true;
+
+            // Companion bark mesh shares instance matrices & birthTime attribute (FIXES SEE-THROUGH BARK)
+            const barkInst = new THREE.InstancedMesh(barkGeo.clone(), barkMat, instMesh.count);
+            barkInst.geometry.setAttribute('aBirthTime', birthAttr);
+            barkInst.instanceMatrix = instMesh.instanceMatrix; // shared buffer!
+            barkInst.instanceColor = null;
+            barkInst.castShadow = instMesh.castShadow;
+            barkInst.receiveShadow = instMesh.receiveShadow;
+            barkInst.frustumCulled = instMesh.frustumCulled;
+            barkInst._isOakTree = true;
+            scene.add(barkInst);
+        });
+    }
+
+    // Load single Pine model (Pine_ultra_fast) for 1 pine draw call - massively scaled up
     gltfLoader.load('assets/Pine_ultra_fast.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instTree1, instTree3], 22.0);
+        applyGLBPineTree(gltf, [instTree1], 28.0);
     });
 
-    gltfLoader.load('assets/Pine_1_ultra_fast.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instTree2, instTree4], 20.0);
-    });
-
-    gltfLoader.load('assets/tree_oak1.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instOak1], 18.0);
-    });
-    gltfLoader.load('assets/tree_oak2.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instOak2], 20.0);
-    });
-    gltfLoader.load('assets/tree_oak3.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instOak3], 22.0);
+    // Load single NormalTree model (NormalTree_5) for Golden Plains - massively scaled up
+    gltfLoader.load('assets/normal_tree_5.glb', (gltf) => {
+        applyGLBOakTree(gltf, [instOak1], 28.0);
     });
 
     gltfLoader.load(
@@ -4298,7 +4513,8 @@ initMapUI();
             const newDist = Math.sqrt(dx*dx + dy*dy);
             
             cameraZoomDist = initialZoomDist * (initialPinchDist / newDist);
-            cameraZoomDist = Math.max(5.0, Math.min(100.0, cameraZoomDist));
+            let maxZoom = typeof isFreeCam !== 'undefined' && isFreeCam ? 2500.0 : 100.0;
+            cameraZoomDist = Math.max(5.0, Math.min(maxZoom, cameraZoomDist));
             
             if (cameraZoomDist > 25.0) document.getElementById('zoom-toggle').innerText = 'Zoom In';
             else document.getElementById('zoom-toggle').innerText = 'Zoom Out';
@@ -4645,7 +4861,8 @@ initMapUI();
                 let dx = (Math.random() - 0.5) * crystalDist * 2.0;
                 let dz = (Math.random() - 0.5) * crystalDist * 2.0;
                 const cX = playerGrp.position.x + dx;
-                const cZ = Math.max(48500, Math.min(65500, playerGrp.position.z + dz));
+                // Move crystals out of Jungle and into Crystal Land! (70000 to 104000)
+                const cZ = Math.max(71000, Math.min(103000, playerGrp.position.z + dz));
                 const cGroundY = getWorldHeight(cX, cZ);
                 
                 let spawnY = cGroundY + 100 + Math.random() * 150;
@@ -4819,8 +5036,11 @@ initMapUI();
         const dynamicFar = 800 + Math.max(0, playerGrp.position.y - 300.0) * 2.2;
         const dynamicNear = 10 + Math.max(0, playerGrp.position.y - 300.0) * 0.4;
         
-        scene.fog.far += (dynamicFar - scene.fog.far) * dt * 2.0;
-        scene.fog.near += (dynamicNear - scene.fog.near) * dt * 2.0;
+        const targetFar = isFogEnabled ? dynamicFar : 9999999;
+        const targetNear = isFogEnabled ? dynamicNear : 9999998;
+        
+        scene.fog.far += (targetFar - scene.fog.far) * dt * 2.0;
+        scene.fog.near += (targetNear - scene.fog.near) * dt * 2.0;
 
         const altitude = Math.max(0, playerGrp.position.y - groundY);
 
@@ -5278,7 +5498,7 @@ initMapUI();
     // Pre-warm the world so it is fully populated instantly on load
     updateTerrainGeometry(playerGrp.position.x, playerGrp.position.z);
     isPrewarming = true;
-    for (let pre = 0; pre < 10; pre++) {
+    for (let pre = 0; pre < 30; pre++) { // Run 30 times to update ALL 30 frame-chunks of trees
         currentFrame = pre;
         logicTimer = 1.0; // Force shouldUpdateTerrain = true
         updateInstances(playerGrp.position.x, playerGrp.position.z, 0, 1.0 / 60.0, 0);

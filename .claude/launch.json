@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["serve.cjs"],
+      "port": 8118,
+      "autoPort": true
+    }
+  ]
+}

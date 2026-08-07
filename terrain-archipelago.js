@@ -26,7 +26,7 @@ export default {
         const archNoise = snoise(x * 0.002, z * 0.002);
         let y = archNoise * 6.0 - 4.5;
         // Dist from center: center of archipelago is at zone = 1.0
-        const distFromCenter = Math.abs(zone - 1.0);
+        const distFromCenter = zone !== undefined ? Math.abs(zone - 1.0) : 0.0;
         const islandThreshold = 0.88 - distFromCenter * 0.15;
         if (archNoise > islandThreshold) {
             y += (archNoise - islandThreshold) * 80.0;

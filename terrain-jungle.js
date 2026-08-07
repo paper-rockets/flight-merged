@@ -33,7 +33,7 @@ export default {
         const n3 = snoise(x * 0.02, z * 0.02);
         let ridge = 1.0 - Math.abs(n1);
         ridge = ridge * ridge;
-        const h = ridge * 65.0 - 2.0 + n2 * 14.0 + n3 * 4.0;
+        const h = (ridge * 65.0 - 2.0 + n2 * 14.0 + n3 * 4.0) * 0.6;
         let finalH = h + 8.0;
         finalH = finalH < 7.5 ? 7.5 + (finalH - 7.5) * 0.15 : finalH;
 

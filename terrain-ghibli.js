@@ -47,8 +47,8 @@ export default {
 
         // Sparse small ponds (applied AFTER the base clamp)
         const pondN = snoise(x * 0.012 + 880.0, z * 0.012 - 550.0);
-        if (pondN > 0.78) {
-            let t = Math.min((pondN - 0.78) / 0.15, 1.0);
+        if (pondN > 0.88) { // Threshold increased to reduce ponds by ~80%
+            let t = Math.min((pondN - 0.88) / 0.15, 1.0);
             let c = t * t * (3.0 - 2.0 * t);
             y -= c * 8.0;
         }

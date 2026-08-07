@@ -482,70 +482,6 @@
       .hint { display: none; }
     }
 
-    /* ============================================================
-       Water Editor reskin — match the compact main GUI (lil-gui) look.
-       All rules scoped to #water-editor so nothing leaks into lil-gui.
-       ============================================================ */
-    #water-editor-header { cursor: move; }
-    #water-editor .panel {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      width: 300px;
-      padding: 12px 14px;
-      border-radius: 8px;
-    }
-    #water-editor .title {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      margin-top: 0;
-    }
-    #water-editor .subtitle {
-      font-family: inherit;
-      font-size: 10px;
-      letter-spacing: 0.01em;
-    }
-    #water-editor .eyebrow {
-      font-family: inherit;
-      letter-spacing: 0.08em;
-    }
-    #water-editor .control { margin-top: 11px; }
-    #water-editor .control-head { margin-bottom: 5px; }
-    #water-editor .control-head label {
-      font-family: inherit;
-      font-size: 11px;
-      letter-spacing: normal;
-      text-transform: none;
-      color: rgba(255, 255, 255, 0.85);
-    }
-    #water-editor .control-head .value {
-      font-family: inherit;
-      font-size: 11px;
-      letter-spacing: normal;
-      text-transform: none;
-    }
-    #water-editor .tab-btn {
-      font-family: inherit;
-      font-size: 11px;
-      letter-spacing: normal;
-      text-transform: none;
-      padding: 5px 0;
-    }
-    #water-editor .pill {
-      font-family: inherit;
-      font-size: 11px;
-      letter-spacing: normal;
-      text-transform: none;
-    }
-    #water-editor .preset-btn {
-      font-family: inherit;
-      font-size: 10px;
-      letter-spacing: normal;
-      text-transform: none;
-    }
-    #water-editor .fps {
-      font-family: inherit;
-      letter-spacing: normal;
-    }
 
 </style>
 </head>
@@ -578,6 +514,11 @@ console.error = function(...args) {
     <div id="fps-counter" style="color: #fff; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none;">0 FPS</div>
     <div id="biome-label" style="color: #ffe066; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; opacity: 0.9;"></div>
     <button id="time-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">☀️</button>
+    <div style="display: flex; align-items: center; gap: 4px; margin-left: 4px;">
+      <button id="music-bar-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;" title="Toggle Music">🔇</button>
+      <span id="music-track-name" style="color: #ccc; font-family: monospace; font-size: 11px; display: none; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+      <button id="music-bar-skip" style="background: none; border: none; color: white; cursor: pointer; font-size: 13px; padding: 0; display: none;" title="Next Track">⏭</button>
+    </div>
     <button id="gui-toggle-btn" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-left: 6px;">⚙️ Settings (H)</button>
   </div>
 
@@ -611,7 +552,7 @@ console.error = function(...args) {
 
 
   
-  <!-- Crystal Editor UI -->
+  <!-- Old water editor HTML (hidden, replaced by lil-gui popup) -->
   <div id="water-editor" style="display:none; z-index: 10000; position: fixed; top:0; left:0; width: 100%; height: 100%; pointer-events: none;">
     <div class="panel-wrap">
       <section class="panel" id="mainPanel" aria-label="Ocean controls">
@@ -623,12 +564,19 @@ console.error = function(...args) {
           <button class="pill" id="minimizeBtn" title="Collapse/Expand Menu" style="padding: 3px 9px; font-size: 11px; cursor: pointer; border: 1px solid rgba(255,255,255,0.18); min-width: 28px; text-align: center;">–</button>
         </div>
 
+        <!-- Per-biome selector -->
+        <div class="control" style="margin-top:0; margin-bottom:8px;">
+          <div class="control-head" style="margin-bottom:4px;"><label>Editing Water For</label></div>
+          <select id="water-biome-select" style="width:100%; padding:4px 6px; border-radius:6px; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.4); color:#fff; font-size:12px; font-family:inherit;">
+          </select>
+        </div>
+
         <!-- Nav Tabs -->
         <div class="tab-bar">
           <button class="tab-btn active" data-tab="waves">Waves</button>
           <button class="tab-btn" data-tab="spectrum">Spectrum</button>
-          <button class="tab-btn" data-tab="environment">Atmosphere</button>
-          <button class="tab-btn" data-tab="camera">View</button>
+          <button class="tab-btn" data-tab="environment" disabled style="opacity:0.4; cursor:default;">Atmosphere</button>
+          <button class="tab-btn" data-tab="camera" disabled style="opacity:0.4; cursor:default;">View</button>
         </div>
 
         <!-- Tab 1: Waves -->
@@ -1016,7 +964,6 @@ import { createToonWater, createRealisticWater, switchWaterMode } from './WaterS
 
     import * as THREE from 'three';
     import { initTerrainEditor } from './TerrainEditor.js';
-    import { initWaterEditor } from './WaterEditor.js';
     import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
@@ -1331,9 +1278,6 @@ initMapUI();
         isHD = v;
         renderer.setPixelRatio(isHD ? Math.min(window.devicePixelRatio, 2) : 0.5);
     });
-    perfFolder.add(params, 'exposure', 0.5, 4.0, 0.1).name('☀️ Global Brightness').onChange(v => {
-        renderer.toneMappingExposure = v;
-    });
     perfFolder.add(params, 'terrainRes', ['256', '128', '64']).name('Terrain Res').onChange(v => {
         terrainRes = parseInt(v);
         const newGeo = new THREE.PlaneGeometry(4000, 4000, terrainRes, terrainRes);
@@ -1392,26 +1336,110 @@ initMapUI();
         const btn = document.getElementById('editor-toggle');
         if (btn) btn.click();
     }}, 'openTerrainEditor').name('🔧 Terrain Editor');
-    editorFolder.add({ openWaterEditor: () => {
-        const waterEditor = document.getElementById('water-editor');
-        if (waterEditor) waterEditor.style.display = 'block';
-    }}, 'openWaterEditor').name('🌊 Water Editor');
-    // Removed Edit Crystals button from here
+    let waterEditorGui = null;
+    const uniformToBiomeKey = {
+        uSea: 'waterSeaState', uWaveHeight: 'waterWaveHeight', uOceanScale: 'waterOceanScale',
+        uSwellWavelength: 'waterSwellWavelength', uWaveSpeed: 'waterWaveSpeed',
+        uFoamAmount: 'waterFoamAmount', uWaterOpacity: 'waterOpacity',
+        uChopPatchiness: 'waterChopPatchiness', uDetailAmount: 'waterDetailAmount',
+        uChop: 'waterChop', uWindDir: 'waterWindDir', uDirSpread: 'waterDirSpread'
+    };
+    const biomeKeyToUniform = Object.fromEntries(Object.entries(uniformToBiomeKey).map(([u, b]) => [b, u]));
 
-    initWaterEditor(
-        () => currentWaterState.uniforms,
-        (k, v) => {
-            const biome = editingState.selectedBiome !== 'All Biomes (Default)' ? editingState.selectedBiome : (currentActiveBiomeName || 'Archipelago');
-            biomeSettingsMgr.setOverride(biome, k, v);
-            if (currentActiveBiomeName === biome) applyBiomeSettings(biome);
+    function buildWaterControls(wavesF, wState) {
+        while (wavesF.controllers.length > 0) wavesF.controllers[0].destroy();
+        const eff = biomeSettingsMgr.getEffective(wState.editingBiome);
+        const getU = () => currentWaterState ? currentWaterState.uniforms : null;
+        const setU = (biomeKey, uName, val) => {
+            const u = getU();
+            if (u && u[uName]) u[uName].value = val;
+            biomeSettingsMgr.setOverride(wState.editingBiome, biomeKey, val);
+            if (currentActiveBiomeName === wState.editingBiome) applyBiomeSettings(wState.editingBiome);
+        };
+        const wp = {
+            waterSeaState: eff.waterSeaState ?? 0.45,
+            waterWaveHeight: eff.waterWaveHeight ?? 1.0,
+            waterOceanScale: eff.waterOceanScale ?? 1.0,
+            waterSwellWavelength: eff.waterSwellWavelength ?? 1.0,
+            waterWaveSpeed: eff.waterWaveSpeed ?? 1.0,
+            waterFoamAmount: eff.waterFoamAmount ?? 1.0,
+            waterOpacity: eff.waterOpacity ?? 0.85,
+            waterChopPatchiness: eff.waterChopPatchiness ?? 1.0,
+            waterDetailAmount: eff.waterDetailAmount ?? 1.0,
+            waterChop: eff.waterChop ?? 0.5,
+            waterWindDir: eff.waterWindDir ?? 45,
+            waterDirSpread: eff.waterDirSpread ?? 0.45
+        };
+        wavesF.add(wp, 'waterSeaState', 0, 1, 0.01).name('Sea State').onChange(v => setU('waterSeaState', 'uSea', v));
+        wavesF.add(wp, 'waterWaveHeight', 0, 3, 0.01).name('Wave Height').onChange(v => setU('waterWaveHeight', 'uWaveHeight', v));
+        wavesF.add(wp, 'waterOceanScale', 0.5, 3, 0.01).name('Ocean Scale').onChange(v => setU('waterOceanScale', 'uOceanScale', v));
+        wavesF.add(wp, 'waterSwellWavelength', 0.5, 2.5, 0.01).name('Swell Wavelength').onChange(v => setU('waterSwellWavelength', 'uSwellWavelength', v));
+        wavesF.add(wp, 'waterWaveSpeed', 0.1, 3, 0.01).name('Wave Speed').onChange(v => setU('waterWaveSpeed', 'uWaveSpeed', v));
+        wavesF.add(wp, 'waterFoamAmount', 0, 1, 0.01).name('Foam Coverage').onChange(v => setU('waterFoamAmount', 'uFoamAmount', v));
+        wavesF.add(wp, 'waterOpacity', 0.1, 1, 0.01).name('Water Opacity').onChange(v => setU('waterOpacity', 'uWaterOpacity', v));
+        wavesF.add(wp, 'waterChopPatchiness', 0, 2.5, 0.01).name('Chop Patchiness').onChange(v => setU('waterChopPatchiness', 'uChopPatchiness', v));
+        wavesF.add(wp, 'waterDetailAmount', 0, 2.5, 0.01).name('Turbulence').onChange(v => setU('waterDetailAmount', 'uDetailAmount', v));
+        wavesF.add(wp, 'waterChop', 0, 1, 0.01).name('Choppiness').onChange(v => setU('waterChop', 'uChop', v));
+        wavesF.add(wp, 'waterWindDir', 0, 360, 1).name('Wind Direction').onChange(v => setU('waterWindDir', 'uWindDir', v));
+        wavesF.add(wp, 'waterDirSpread', 0, 1, 0.01).name('Directional Spread').onChange(v => setU('waterDirSpread', 'uDirSpread', v));
+    }
+
+    function toggleWaterEditorPopup() {
+        if (waterEditorGui) {
+            const el = waterEditorGui.domElement;
+            const opening = el.style.display === 'none';
+            el.style.display = opening ? '' : 'none';
+            if (opening) el.style.zIndex = '10002';
+            return;
         }
-    );
+        waterEditorGui = new GUI({ title: '🌊 KIMI SEA Water Editor', width: 340 });
+        const el = waterEditorGui.domElement;
+        el.style.position = 'fixed';
+        el.style.right = 'auto';
+        el.style.left = '60px';
+        el.style.top = '60px';
+        el.style.zIndex = '10002';
+        el.style.maxHeight = '86vh';
+        el.style.overflowY = 'auto';
+
+        const biomeNames = ['🌊 Archipelago','🌳 Ghibli Land','🌾 Golden Plains','🏔️ Misty Mountains I','🌴 Lush Jungle I','💎 Crystal Land','🏔️ Misty Mountains II','🌳 Ghibli Land II','🌊 Open Ocean'];
+        const wState = { editingBiome: currentActiveBiomeName || biomeNames[0] };
+
+        const wavesF = waterEditorGui.addFolder('Waves');
+        wavesF.open();
+
+        waterEditorGui.add(wState, 'editingBiome', biomeNames).name('Editing For').onChange(() => buildWaterControls(wavesF, wState));
+        buildWaterControls(wavesF, wState);
+
+        const specF = waterEditorGui.addFolder('Spectrum (10 Waves)');
+        const getU = () => currentWaterState ? currentWaterState.uniforms : null;
+        for (let i = 0; i < 10; i++) {
+            const wf = specF.addFolder('Wave ' + (i + 1));
+            const comp = { wavelength: 50, steepness: 50, direction: 0 };
+            const updateComp = () => {
+                const u = getU();
+                if (!u || !u.uW_k) return;
+                const k = 2 * Math.PI / comp.wavelength;
+                u.uW_k.value[i] = k;
+                u.uW_c.value[i] = Math.sqrt(9.8 / k);
+                u.uW_st.value[i] = comp.steepness / 1000;
+                const rad = comp.direction * Math.PI / 180;
+                u.uW_dir.value[i].set(Math.cos(rad), Math.sin(rad));
+            };
+            wf.add(comp, 'wavelength', 5, 300, 1).name('Wavelength').onChange(updateComp);
+            wf.add(comp, 'steepness', 0, 200, 1).name('Steepness').onChange(updateComp);
+            wf.add(comp, 'direction', 0, 360, 1).name('Direction').onChange(updateComp);
+        }
+
+        waterEditorGui.add({ closeWin: () => { el.style.display = 'none'; } }, 'closeWin').name('✖ Close Window');
+        makeGuiDraggable(waterEditorGui);
+    }
+    editorFolder.add({ openWaterEditor: toggleWaterEditorPopup }, 'openWaterEditor').name('🌊 Water Editor');
 
     // Add Game folder
     const gameFolder = gui.addFolder('Game');
         gameFolder.add(guiActions, 'switchModel').name('Switch Character');
-    gameFolder.add(guiActions, 'toggleMusic').name('Toggle Music');
-    gameFolder.add(guiActions, 'nextTrack').name('Next Track');
+    // Music controls moved to top bar
     gameFolder.add(params, 'summerFilter').name('Summer Filter').onChange(v => { document.getElementById('summer-toggle').click(); });
     gameFolder.add(params, 'modelVisible').name('Model Visible').onChange(v => { document.getElementById('invis-toggle').click(); });
     gameFolder.add(guiActions, 'fullscreen').name('Fullscreen');
@@ -1425,45 +1453,12 @@ initMapUI();
     envFolder.add(params, 'rainWindAngle', 0, 360, 1).name('Rain Wind').onChange(v => { if(rainSystem) rainSystem.setWindAngle(v); });
     envFolder.addColor(params, 'rainColor').name('Rain Color').onChange(v => { if(rainSystem) rainSystem.setColor(v); });
 
-    const toonWaterParams = { shallowColor: '#00fccd', deepColor: '#1ceeff', foamColor: '#ffffff', waveSpeed: 1.0, waveHeight: 0.3, waveFreq: 0.3, patternDensity: 45, waterOpacity: 0.85 };
-    const toonWaterControls = [];
-    const realisticWaterParams = { shallowColor: '#0e5257', deepColor: '#04171c', foamColor: '#ebf5fc', seaState: 0.45, waveSpeed: 1.0, waveHeight: 1.0, swellWavelength: 1.0, detailAmount: 1.0, foamAmount: 1.0, waterOpacity: 0.85 };
-    const realisticWaterControls = [];
-
-    envFolder.add(params, 'waterMode', ['default', 'toon', 'realistic']).name('Water Style').onChange(v => {
-        const result = switchWaterMode(v, scene, currentWaterState.mesh, camera);
-        currentWaterState = result;
-        waterMesh = result.mesh;
-        // Show/hide toon and realistic water controls based on mode
-        toonWaterControls.forEach(c => c.domElement.parentElement.parentElement.style.display = v === 'toon' ? '' : 'none');
-        realisticWaterControls.forEach(c => c.domElement.parentElement.parentElement.style.display = v === 'realistic' ? '' : 'none');
-    });
-    toonWaterControls.push(envFolder.addColor(toonWaterParams, 'shallowColor').name('Shallow Color').onChange(v => { if(currentWaterState.uniforms.uColorNear) currentWaterState.uniforms.uColorNear.value.set(v); }));
-    toonWaterControls.push(envFolder.addColor(toonWaterParams, 'deepColor').name('Deep Color').onChange(v => { if(currentWaterState.uniforms.uColorFar) currentWaterState.uniforms.uColorFar.value.set(v); }));
-    toonWaterControls.push(envFolder.addColor(toonWaterParams, 'foamColor').name('Foam Color').onChange(v => { if(currentWaterState.uniforms.uFoamColor) currentWaterState.uniforms.uFoamColor.value.set(v); }));
-    toonWaterControls.push(envFolder.add(toonWaterParams, 'waveSpeed', 0.1, 4.0, 0.1).name('Wave Speed').onChange(v => { if(currentWaterState.uniforms.uWaveSpeed) currentWaterState.uniforms.uWaveSpeed.value = v; }));
-    toonWaterControls.push(envFolder.add(toonWaterParams, 'waveHeight', 0.0, 1.5, 0.05).name('Wave Height').onChange(v => { if(currentWaterState.uniforms.uWaveAmplitude) currentWaterState.uniforms.uWaveAmplitude.value = v; }));
-    toonWaterControls.push(envFolder.add(toonWaterParams, 'waveFreq', 0.05, 2.0, 0.05).name('Wave Freq').onChange(v => { if(currentWaterState.uniforms.uWaveFrequency) currentWaterState.uniforms.uWaveFrequency.value = v; }));
-    toonWaterControls.push(envFolder.add(toonWaterParams, 'patternDensity', 1, 90, 1).name('Pattern Density').onChange(v => { if(currentWaterState.uniforms.uTextureSize) currentWaterState.uniforms.uTextureSize.value = v; }));
-    toonWaterControls.push(envFolder.add(toonWaterParams, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity').onChange(v => { if(currentWaterState.uniforms.uWaterOpacity) currentWaterState.uniforms.uWaterOpacity.value = v; }));
-    toonWaterControls.forEach(c => c.domElement.parentElement.parentElement.style.display = 'none');
-
-    realisticWaterControls.push(envFolder.addColor(realisticWaterParams, 'shallowColor').name('Real Shallow Color').onChange(v => { if(currentWaterState.uniforms.uShallowColor) currentWaterState.uniforms.uShallowColor.value.set(v); }));
-    realisticWaterControls.push(envFolder.addColor(realisticWaterParams, 'deepColor').name('Real Deep Color').onChange(v => { if(currentWaterState.uniforms.uDeepColor) currentWaterState.uniforms.uDeepColor.value.set(v); }));
-    realisticWaterControls.push(envFolder.addColor(realisticWaterParams, 'foamColor').name('Real Foam Color').onChange(v => { if(currentWaterState.uniforms.uFoamColor) currentWaterState.uniforms.uFoamColor.value.set(v); }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'seaState', 0.1, 1.5, 0.05).name('Sea State').onChange(v => { if(currentWaterState.uniforms.uSea) currentWaterState.uniforms.uSea.value = v; }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'waveSpeed', 0.1, 3.0, 0.1).name('Wave Speed').onChange(v => { if(currentWaterState.uniforms.uWaveSpeed) currentWaterState.uniforms.uWaveSpeed.value = v; }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'waveHeight', 0.0, 3.0, 0.1).name('Wave Height').onChange(v => { if(currentWaterState.uniforms.uWaveHeight) currentWaterState.uniforms.uWaveHeight.value = v; }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'swellWavelength', 0.2, 2.5, 0.1).name('Swell Length').onChange(v => { if(currentWaterState.uniforms.uSwellWavelength) currentWaterState.uniforms.uSwellWavelength.value = v; }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'detailAmount', 0.0, 2.0, 0.1).name('Chop Detail').onChange(v => { if(currentWaterState.uniforms.uDetailAmount) currentWaterState.uniforms.uDetailAmount.value = v; }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'foamAmount', 0.0, 2.0, 0.1).name('Foam Coverage').onChange(v => { if(currentWaterState.uniforms.uFoamAmount) currentWaterState.uniforms.uFoamAmount.value = v; }));
-    realisticWaterControls.push(envFolder.add(realisticWaterParams, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity').onChange(v => { if(currentWaterState.uniforms.uWaterOpacity) currentWaterState.uniforms.uWaterOpacity.value = v; }));
-    realisticWaterControls.forEach(c => c.domElement.parentElement.parentElement.style.display = 'none');
-
     envFolder.add(params, 'fogPlane').name('Ground Fog').onChange(v => { if(typeof window.fogGroup !== 'undefined') window.fogGroup.visible = v; });
     envFolder.add(params, 'godRays').name('God Rays').onChange(v => { godRaysPass.enabled = v; });
     envFolder.add(params, 'godRayIntensity', 0, 2, 0.05).name('Ray Intensity').onChange(v => { godRaysPass.uniforms.uIntensity.value = v; });
     envFolder.add(params, 'trails').name('Wind Trails').onChange(v => isWindTrailsOn = v);
+    params.birdSounds = true;
+    envFolder.add(params, 'birdSounds').name('Bird Sounds');
 
     const debugFolder = gui.addFolder('🔧 Debug Render');
     debugFolder.add(params, 'showTerrain').name('Terrain').onChange(v => { terrain.visible = v; });
@@ -1565,21 +1560,9 @@ initMapUI();
             if (extras.extra_windStrength !== undefined) {
                 window.biomeWindStrength = extras.extra_windStrength;
             }
-            if (extras.extra_snowLineHeight !== undefined) {
-                window.snowLineHeight = extras.extra_snowLineHeight;
-            }
         } else if (cat === 'plains') {
             if (extras.extra_goldenHourTint && typeof dirLight !== 'undefined') {
                 dirLight.color.set(extras.extra_goldenHourTint);
-            }
-            if (typeof renderer !== 'undefined') {
-                renderer.toneMappingExposure = (extras.exposure !== undefined ? extras.exposure : 1.8) * 1.1;
-            }
-            if (extras.extra_grassSwaySpeed !== undefined) {
-                window.grassSwaySpeed = extras.extra_grassSwaySpeed;
-            }
-            if (extras.extra_wheatDensity !== undefined) {
-                window.wheatDensity = extras.extra_wheatDensity;
             }
         } else if (cat === 'crystal') {
             if (typeof bloomPass !== 'undefined' && extras.extra_crystalGlow !== undefined) {
@@ -1593,9 +1576,6 @@ initMapUI();
                     });
                 }
             }
-            if (extras.extra_bioluminescence !== undefined) {
-                window.bioluminescence = !!extras.extra_bioluminescence;
-            }
         } else if (cat === 'ghibli') {
             if (extras.extra_ambientWarmth && typeof ambientLight !== 'undefined') {
                 ambientLight.color.set(extras.extra_ambientWarmth);
@@ -1606,6 +1586,7 @@ initMapUI();
         }
     }
 
+    const defaultBloomStrength = 0.4;
     function applyBiomeSettings(biomeName) {
         if (!biomeName) return;
         const eff = biomeSettingsMgr.getEffective(biomeName);
@@ -1641,6 +1622,14 @@ initMapUI();
             treeUniforms.uTreeScale.value = eff.treeScale;
         }
 
+        // Tree Density — store for use by updateInstances()
+        window.biomeTreeDensity = eff.treeDensity !== undefined ? eff.treeDensity : 1.0;
+
+        // Bird sounds
+        if (typeof params !== 'undefined' && eff.birdSounds !== undefined) {
+            params.birdSounds = eff.birdSounds;
+        }
+
         // 2. Summer Filter Pass
         if (typeof summerPass !== 'undefined' && eff.summerFilter !== undefined) {
             summerPass.enabled = !!eff.summerFilter;
@@ -1658,9 +1647,12 @@ initMapUI();
             }
         }
 
-        // 4. Ground Fog Group
+        // 4. Ground Fog Group + Fog Density
         if (typeof window.fogGroup !== 'undefined' && eff.fogPlane !== undefined) {
             window.fogGroup.visible = !!eff.fogPlane;
+        }
+        if (typeof scene !== 'undefined' && scene.fog && eff.fogDensity !== undefined) {
+            scene.fog.far = 2000 - eff.fogDensity * 800;
         }
 
         // 5. God Rays Pass & Intensity
@@ -1671,17 +1663,20 @@ initMapUI();
             }
         }
 
-        // 6. Bloom Pass
-        if (typeof bloomPass !== 'undefined' && eff.bloom !== undefined) {
-            bloomPass.enabled = !!eff.bloom;
-            if (typeof isBloomOn !== 'undefined') isBloomOn = !!eff.bloom;
+        // 6. Bloom Pass (reset strength to default; crystal extras will override)
+        if (typeof bloomPass !== 'undefined') {
+            if (eff.bloom !== undefined) {
+                bloomPass.enabled = !!eff.bloom;
+                if (typeof isBloomOn !== 'undefined') isBloomOn = !!eff.bloom;
+            }
+            bloomPass.strength = defaultBloomStrength;
         }
 
         // 7. Wind & Trails
         if (eff.wind !== undefined && typeof isWindOn !== 'undefined') isWindOn = !!eff.wind;
         if (eff.trails !== undefined && typeof isWindTrailsOn !== 'undefined') isWindTrailsOn = !!eff.trails;
 
-        // 8. Renderer Exposure
+        // 8. Renderer Exposure (single source of truth)
         if (typeof renderer !== 'undefined' && eff.exposure !== undefined) {
             renderer.toneMappingExposure = eff.exposure;
         }
@@ -1689,17 +1684,80 @@ initMapUI();
         // 9. Biome Extras
         applyBiomeExtras(biomeName, eff);
 
-        // 10. Water Mode
+        // 10. Water Mode + apply water uniforms after switch
         if (eff.waterMode !== undefined && typeof currentWaterState !== 'undefined' && currentWaterState && currentWaterState.mode !== eff.waterMode) {
             const result = switchWaterMode(eff.waterMode, scene, currentWaterState.mesh, camera);
             currentWaterState = result;
             waterMesh = result.mesh;
-            if (typeof toonWaterControls !== 'undefined') {
-                toonWaterControls.forEach(c => c.domElement.parentElement.parentElement.style.display = eff.waterMode === 'toon' ? '' : 'none');
+        }
+        if (typeof currentWaterState !== 'undefined' && currentWaterState && currentWaterState.uniforms) {
+            const u = currentWaterState.uniforms;
+            if (eff.waterMode === 'toon') {
+                if (u.uColorNear && eff.waterShallowColor) u.uColorNear.value.set(eff.waterShallowColor);
+                if (u.uColorFar && eff.waterDeepColor) u.uColorFar.value.set(eff.waterDeepColor);
+                if (u.uFoamColor && eff.waterFoamColor) u.uFoamColor.value.set(eff.waterFoamColor);
+                if (u.uWaveSpeed && eff.waterWaveSpeed !== undefined) u.uWaveSpeed.value = eff.waterWaveSpeed;
+                if (u.uWaveAmplitude && eff.waterWaveHeight !== undefined) u.uWaveAmplitude.value = eff.waterWaveHeight;
+                if (u.uWaveFrequency && eff.waterWaveFreq !== undefined) u.uWaveFrequency.value = eff.waterWaveFreq;
+                if (u.uTextureSize && eff.waterPatternDensity !== undefined) u.uTextureSize.value = eff.waterPatternDensity;
+                if (u.uWaterOpacity && eff.waterOpacity !== undefined) u.uWaterOpacity.value = eff.waterOpacity;
+            } else if (eff.waterMode === 'realistic') {
+                if (u.uShallowColor && eff.waterShallowColor) u.uShallowColor.value.set(eff.waterShallowColor);
+                if (u.uDeepColor && eff.waterDeepColor) u.uDeepColor.value.set(eff.waterDeepColor);
+                if (u.uFoamColor && eff.waterFoamColor) u.uFoamColor.value.set(eff.waterFoamColor);
+                if (u.uSea && eff.waterSeaState !== undefined) u.uSea.value = eff.waterSeaState;
+                if (u.uWaveSpeed && eff.waterWaveSpeed !== undefined) u.uWaveSpeed.value = eff.waterWaveSpeed;
+                if (u.uWaveHeight && eff.waterWaveHeight !== undefined) u.uWaveHeight.value = eff.waterWaveHeight;
+                if (u.uSwellWavelength && eff.waterSwellWavelength !== undefined) u.uSwellWavelength.value = eff.waterSwellWavelength;
+                if (u.uDetailAmount && eff.waterDetailAmount !== undefined) u.uDetailAmount.value = eff.waterDetailAmount;
+                if (u.uFoamAmount && eff.waterFoamAmount !== undefined) u.uFoamAmount.value = eff.waterFoamAmount;
+                if (u.uWaterOpacity && eff.waterOpacity !== undefined) u.uWaterOpacity.value = eff.waterOpacity;
+                if (u.uOceanScale && eff.waterOceanScale !== undefined) u.uOceanScale.value = eff.waterOceanScale;
+                if (u.uChopPatchiness && eff.waterChopPatchiness !== undefined) u.uChopPatchiness.value = eff.waterChopPatchiness;
+                if (u.uChop && eff.waterChop !== undefined) u.uChop.value = eff.waterChop;
+                if (u.uWindDir && eff.waterWindDir !== undefined) u.uWindDir.value = eff.waterWindDir;
+                if (u.uDirSpread && eff.waterDirSpread !== undefined) u.uDirSpread.value = eff.waterDirSpread;
             }
-            if (typeof realisticWaterControls !== 'undefined') {
-                realisticWaterControls.forEach(c => c.domElement.parentElement.parentElement.style.display = eff.waterMode === 'realistic' ? '' : 'none');
-            }
+        }
+
+        // 11. Sky Override (fully replaces time-of-day when enabled)
+        if (eff.overrideSky) {
+            window.biomeOverridesSky = {
+                bg: new THREE.Color(eff.skyColorTop),
+                amb: new THREE.Color(eff.ambientLightColor),
+                ambI: eff.ambientLightIntensity,
+                dir: new THREE.Color(eff.dirLightColor),
+                dirI: eff.dirLightIntensity
+            };
+        } else {
+            window.biomeOverridesSky = null;
+        }
+
+        // 12. Fog Override
+        if (eff.overrideFog) {
+            window.biomeOverrideFog = {
+                color: new THREE.Color(eff.fogColor),
+                far: eff.fogDensityAtmo || 1800
+            };
+        } else {
+            window.biomeOverrideFog = null;
+        }
+
+        // 13. Cloud Override
+        if (eff.overrideClouds) {
+            window.biomeOverrideClouds = {
+                colors: [eff.cloudColor0, eff.cloudColor1, eff.cloudColor2, eff.cloudColor3, eff.cloudColor4],
+                opBase: eff.cloudOpacityBase,
+                opHigh: eff.cloudOpacityHigh,
+                opWispy: eff.cloudOpacityWispy,
+                opMega: eff.cloudOpacityMega
+            };
+            if (typeof matCloud !== 'undefined') matCloud.opacity = eff.cloudOpacityBase;
+            if (typeof highCloudMat !== 'undefined') highCloudMat.opacity = eff.cloudOpacityHigh;
+            if (typeof matWispyCloud !== 'undefined') matWispyCloud.opacity = eff.cloudOpacityWispy;
+            if (typeof megaCloudMat !== 'undefined') megaCloudMat.opacity = eff.cloudOpacityMega;
+        } else {
+            window.biomeOverrideClouds = null;
         }
 
         // Sync main params object
@@ -1722,6 +1780,8 @@ initMapUI();
             params.wind = eff.wind;
             params.trails = eff.trails;
             params.exposure = eff.exposure;
+            params.birdSounds = eff.birdSounds;
+            gui.controllersRecursive().forEach(c => c.updateDisplay());
         }
     }
 
@@ -1824,12 +1884,6 @@ initMapUI();
         addCtrl(settingsSubFolder.add(effective, 'wind').name('Wind'));
         addCtrl(settingsSubFolder.add(effective, 'trails').name('Wind Trails'));
         addCtrl(settingsSubFolder.add(effective, 'exposure', 0.5, 4.0, 0.1).name('Global Brightness'));
-        const waterModeCtrl = settingsSubFolder.add(effective, 'waterMode', ['default', 'toon', 'realistic']).name('Water Mode');
-        waterModeCtrl.onChange(v => {
-            biomeSettingsMgr.setOverride(editingState.selectedBiome, 'waterMode', v);
-            if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName);
-            refreshBiomeFolderControllers();
-        });
 
         // Also add listeners to override checkboxes so the UI can redraw dynamically
         const overrideSkyCtrl = skyFolder.controllers.find(c => c.property === 'overrideSky');
@@ -1838,31 +1892,6 @@ initMapUI();
         if (overrideFogCtrl) overrideFogCtrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, 'overrideFog', v); refreshAtmosphereFolders(); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); });
         const overrideCloudsCtrl = cloudsFolder.controllers.find(c => c.property === 'overrideClouds');
         if (overrideCloudsCtrl) overrideCloudsCtrl.onChange(v => { biomeSettingsMgr.setOverride(editingState.selectedBiome, 'overrideClouds', v); refreshAtmosphereFolders(); if (currentActiveBiomeName) applyBiomeSettings(currentActiveBiomeName); });
-
-        if (effective.waterMode === 'default') {
-            addCtrl(settingsSubFolder.addColor(effective, 'waterColor').name('Water Color'));
-            addCtrl(settingsSubFolder.add(effective, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity'));
-        } else if (effective.waterMode === 'toon') {
-            addCtrl(settingsSubFolder.addColor(effective, 'waterShallowColor').name('Shallow Color'));
-            addCtrl(settingsSubFolder.addColor(effective, 'waterDeepColor').name('Deep Color'));
-            addCtrl(settingsSubFolder.addColor(effective, 'waterFoamColor').name('Foam Color'));
-            addCtrl(settingsSubFolder.add(effective, 'waterWaveSpeed', 0.1, 4.0, 0.1).name('Wave Speed'));
-            addCtrl(settingsSubFolder.add(effective, 'waterWaveHeight', 0.0, 1.5, 0.05).name('Wave Height'));
-            addCtrl(settingsSubFolder.add(effective, 'waterWaveFreq', 0.05, 2.0, 0.05).name('Wave Freq'));
-            addCtrl(settingsSubFolder.add(effective, 'waterPatternDensity', 1, 90, 1).name('Pattern Density'));
-            addCtrl(settingsSubFolder.add(effective, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity'));
-        } else if (effective.waterMode === 'realistic') {
-            addCtrl(settingsSubFolder.addColor(effective, 'waterShallowColor').name('Real Shallow Color'));
-            addCtrl(settingsSubFolder.addColor(effective, 'waterDeepColor').name('Real Deep Color'));
-            addCtrl(settingsSubFolder.addColor(effective, 'waterFoamColor').name('Real Foam Color'));
-            addCtrl(settingsSubFolder.add(effective, 'waterSeaState', 0.1, 1.5, 0.05).name('Sea State'));
-            addCtrl(settingsSubFolder.add(effective, 'waterWaveSpeed', 0.1, 3.0, 0.1).name('Wave Speed'));
-            addCtrl(settingsSubFolder.add(effective, 'waterWaveHeight', 0.0, 3.0, 0.1).name('Wave Height'));
-            addCtrl(settingsSubFolder.add(effective, 'waterSwellWavelength', 0.2, 2.5, 0.1).name('Swell Length'));
-            addCtrl(settingsSubFolder.add(effective, 'waterDetailAmount', 0.0, 2.0, 0.1).name('Chop Detail'));
-            addCtrl(settingsSubFolder.add(effective, 'waterFoamAmount', 0.0, 2.0, 0.1).name('Foam Coverage'));
-            addCtrl(settingsSubFolder.add(effective, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity'));
-        }
     }
 
     function refreshBiomeExtrasFolder(targetBiomeName) {
@@ -1900,17 +1929,13 @@ initMapUI();
             addExtraCtrl(biomeExtrasFolder.addColor(effective, 'extra_jungleFogColor').name('Fog Color Tint'));
             addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_ambientDarkness', 0, 1, 0.05).name('Ambient Darkness'));
         } else if (cat === 'mountains') {
-            addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_snowLineHeight', 30, 80, 1).name('Snow Line Height'));
             addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_mistDensity', 0, 1, 0.05).name('Mist Density'));
             addExtraCtrl(biomeExtrasFolder.addColor(effective, 'extra_mistColor').name('Mist Color'));
             addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_windStrength', 0, 2, 0.1).name('Wind Strength'));
         } else if (cat === 'plains') {
-            addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_grassSwaySpeed', 0, 2, 0.1).name('Grass Sway Speed'));
             addExtraCtrl(biomeExtrasFolder.addColor(effective, 'extra_goldenHourTint').name('Golden Hour Tint'));
-            addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_wheatDensity', 0, 1, 0.05).name('Wheat Density'));
         } else if (cat === 'crystal') {
             addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_crystalGlow', 0, 2, 0.05).name('Crystal Glow'));
-            addExtraCtrl(biomeExtrasFolder.add(effective, 'extra_bioluminescence').name('Bioluminescence'));
             addExtraCtrl(biomeExtrasFolder.addColor(effective, 'extra_crystalFogColor').name('Crystal Fog Color'));
             biomeExtrasFolder.add({ openCrystalEditor: () => {
                 const crystalEditor = document.getElementById('crystal-editor');
@@ -1949,31 +1974,6 @@ initMapUI();
             }
         }
     }, 'resetAll').name('🔄 Reset All Biomes');
-
-    // ==========================================
-    // WATER EDITOR — draggable by its header
-    // ==========================================
-    (function makeWaterEditorDraggable() {
-        const header = document.getElementById('water-editor-header');
-        const wrap = document.querySelector('#water-editor .panel-wrap');
-        if (!header || !wrap) return;
-        let dragging = false, ox = 0, oy = 0;
-        header.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#minimizeBtn')) return; // let the collapse button work
-            dragging = true;
-            const r = wrap.getBoundingClientRect();
-            ox = e.clientX - r.left;
-            oy = e.clientY - r.top;
-            e.preventDefault();
-        });
-        window.addEventListener('mousemove', (e) => {
-            if (!dragging) return;
-            wrap.style.left = Math.max(0, e.clientX - ox) + 'px';
-            wrap.style.top = Math.max(0, e.clientY - oy) + 'px';
-            wrap.style.right = 'auto';
-        });
-        window.addEventListener('mouseup', () => { dragging = false; });
-    })();
 
     // ==========================================
     // PER-BIOME-TYPE DRAGGABLE POPUP EDITOR WINDOWS
@@ -2106,35 +2106,8 @@ initMapUI();
             add(settingsF.add(eff, 'wind').name('Wind'));
             add(settingsF.add(eff, 'trails').name('Wind Trails'));
             add(settingsF.add(eff, 'exposure', 0.5, 4.0, 0.1).name('Global Brightness'));
-            const wm = settingsF.add(eff, 'waterMode', ['default', 'toon', 'realistic']).name('Water Mode');
-            wm.onChange(v => {
-                setAll('waterMode', v);
-                fillSettings();
-            });
-            if (eff.waterMode === 'default') {
-                add(settingsF.addColor(eff, 'waterColor').name('Water Color'));
-                add(settingsF.add(eff, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity'));
-            } else if (eff.waterMode === 'toon') {
-                add(settingsF.addColor(eff, 'waterShallowColor').name('Shallow Color'));
-                add(settingsF.addColor(eff, 'waterDeepColor').name('Deep Color'));
-                add(settingsF.addColor(eff, 'waterFoamColor').name('Foam Color'));
-                add(settingsF.add(eff, 'waterWaveSpeed', 0.1, 4.0, 0.1).name('Wave Speed'));
-                add(settingsF.add(eff, 'waterWaveHeight', 0.0, 1.5, 0.05).name('Wave Height'));
-                add(settingsF.add(eff, 'waterWaveFreq', 0.05, 2.0, 0.05).name('Wave Freq'));
-                add(settingsF.add(eff, 'waterPatternDensity', 1, 90, 1).name('Pattern Density'));
-                add(settingsF.add(eff, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity'));
-            } else if (eff.waterMode === 'realistic') {
-                add(settingsF.addColor(eff, 'waterShallowColor').name('Real Shallow Color'));
-                add(settingsF.addColor(eff, 'waterDeepColor').name('Real Deep Color'));
-                add(settingsF.addColor(eff, 'waterFoamColor').name('Real Foam Color'));
-                add(settingsF.add(eff, 'waterSeaState', 0.1, 1.5, 0.05).name('Sea State'));
-                add(settingsF.add(eff, 'waterWaveSpeed', 0.1, 3.0, 0.1).name('Wave Speed'));
-                add(settingsF.add(eff, 'waterWaveHeight', 0.0, 3.0, 0.1).name('Wave Height'));
-                add(settingsF.add(eff, 'waterSwellWavelength', 0.2, 2.5, 0.1).name('Swell Length'));
-                add(settingsF.add(eff, 'waterDetailAmount', 0.0, 2.0, 0.1).name('Chop Detail'));
-                add(settingsF.add(eff, 'waterFoamAmount', 0.0, 2.0, 0.1).name('Foam Coverage'));
-                add(settingsF.add(eff, 'waterOpacity', 0.1, 1.0, 0.05).name('Water Opacity'));
-            }
+            add(settingsF.add(eff, 'treeDensity', 0, 2, 0.1).name('Tree Density'));
+            add(settingsF.add(eff, 'birdSounds').name('Bird Sounds'));
         }
 
         function fillExtras() {
@@ -2151,17 +2124,13 @@ initMapUI();
                 add(extrasF.addColor(eff, 'extra_jungleFogColor').name('Fog Color Tint'));
                 add(extrasF.add(eff, 'extra_ambientDarkness', 0, 1, 0.05).name('Ambient Darkness'));
             } else if (cat === 'mountains') {
-                add(extrasF.add(eff, 'extra_snowLineHeight', 30, 80, 1).name('Snow Line Height'));
                 add(extrasF.add(eff, 'extra_mistDensity', 0, 1, 0.05).name('Mist Density'));
                 add(extrasF.addColor(eff, 'extra_mistColor').name('Mist Color'));
                 add(extrasF.add(eff, 'extra_windStrength', 0, 2, 0.1).name('Wind Strength'));
             } else if (cat === 'plains') {
-                add(extrasF.add(eff, 'extra_grassSwaySpeed', 0, 2, 0.1).name('Grass Sway Speed'));
                 add(extrasF.addColor(eff, 'extra_goldenHourTint').name('Golden Hour Tint'));
-                add(extrasF.add(eff, 'extra_wheatDensity', 0, 1, 0.05).name('Wheat Density'));
             } else if (cat === 'crystal') {
                 add(extrasF.add(eff, 'extra_crystalGlow', 0, 2, 0.05).name('Crystal Glow'));
-                add(extrasF.add(eff, 'extra_bioluminescence').name('Bioluminescence'));
                 add(extrasF.addColor(eff, 'extra_crystalFogColor').name('Crystal Fog Color'));
                 extrasF.add({ openCrystalEditor: () => {
                     const ce = document.getElementById('crystal-editor');
@@ -4799,39 +4768,59 @@ initMapUI();
             document.getElementById('fps-counter').innerText = currentFps + ' FPS | ALT: ' + currentAlt + 'm';
         }
         const isOcean = Math.max(0, 1.0 - (currentGroundY / 5.0)); // 1.0 over ocean/beach, 0.0 over high ground
-        if (isOcean > 0.3 && Math.random() < 0.002) {
+        if (params.birdSounds && isOcean > 0.3 && Math.random() < 0.002) {
             playSeagullCall();
         }
         
-        // 3-Stage Lighting Engine Lerp
+        // 3-Stage Lighting Engine Lerp (biome overrides take precedence)
         const target = envConfigs[timePhase];
-        scene.background.lerp(new THREE.Color(target.bg), dt * 2);
+        const skyOvr = window.biomeOverridesSky;
+        const fogOvr = window.biomeOverrideFog;
 
-        let targetFogColor = new THREE.Color(target.fog);
-        let targetAmbColor = new THREE.Color(target.amb);
-        let targetAmbIntensity = target.ambI;
+        if (skyOvr) {
+            scene.background.lerp(skyOvr.bg, dt * 2);
+            ambientLight.color.lerp(skyOvr.amb, dt * 2);
+            ambientLight.intensity += (skyOvr.ambI - ambientLight.intensity) * dt * 2;
+            dirLight.color.lerp(skyOvr.dir, dt * 2);
+            dirLight.intensity += (skyOvr.dirI - dirLight.intensity) * dt * 2;
+        } else {
+            scene.background.lerp(new THREE.Color(target.bg), dt * 2);
 
-        if (window.currentActiveBiomeExtras) {
-            const ext = window.currentActiveBiomeExtras;
-            const cat = window.currentActiveBiomeCategory;
-            if (cat === 'jungle') {
-                if (ext.extra_jungleFogColor) targetFogColor.set(ext.extra_jungleFogColor);
-                if (ext.extra_ambientDarkness !== undefined) targetAmbIntensity *= (1.0 - ext.extra_ambientDarkness * 0.5);
-            } else if (cat === 'mountains') {
-                if (ext.extra_mistColor) targetFogColor.set(ext.extra_mistColor);
-            } else if (cat === 'crystal') {
-                if (ext.extra_crystalFogColor) targetFogColor.set(ext.extra_crystalFogColor);
-            } else if (cat === 'ghibli') {
-                if (ext.extra_ambientWarmth) targetAmbColor.set(ext.extra_ambientWarmth);
-                if (ext.extra_meadowBrightness !== undefined) targetAmbIntensity *= (0.8 + ext.extra_meadowBrightness * 0.4);
+            let targetAmbColor = new THREE.Color(target.amb);
+            let targetAmbIntensity = target.ambI;
+
+            if (window.currentActiveBiomeExtras) {
+                const ext = window.currentActiveBiomeExtras;
+                const cat = window.currentActiveBiomeCategory;
+                if (cat === 'ghibli') {
+                    if (ext.extra_ambientWarmth) targetAmbColor.set(ext.extra_ambientWarmth);
+                    if (ext.extra_meadowBrightness !== undefined) targetAmbIntensity *= (0.8 + ext.extra_meadowBrightness * 0.4);
+                } else if (cat === 'jungle') {
+                    if (ext.extra_ambientDarkness !== undefined) targetAmbIntensity *= (1.0 - ext.extra_ambientDarkness * 0.5);
+                }
             }
+
+            ambientLight.color.lerp(targetAmbColor, dt * 2);
+            ambientLight.intensity += (targetAmbIntensity - ambientLight.intensity) * dt * 2;
+            dirLight.color.lerp(new THREE.Color(target.dir), dt * 2);
+            dirLight.intensity += (target.dirI - dirLight.intensity) * dt * 2;
         }
 
-        scene.fog.color.lerp(targetFogColor, dt * 2);
-        ambientLight.color.lerp(targetAmbColor, dt * 2);
-        ambientLight.intensity += (targetAmbIntensity - ambientLight.intensity) * dt * 2;
-        dirLight.color.lerp(new THREE.Color(target.dir), dt * 2);
-        dirLight.intensity += (target.dirI - dirLight.intensity) * dt * 2;
+        if (fogOvr) {
+            scene.fog.color.lerp(fogOvr.color, dt * 2);
+            scene.fog.far += (fogOvr.far - scene.fog.far) * dt * 2;
+        } else {
+            let targetFogColor = new THREE.Color(target.fog);
+            if (window.currentActiveBiomeExtras) {
+                const ext = window.currentActiveBiomeExtras;
+                const cat = window.currentActiveBiomeCategory;
+                if (cat === 'jungle' && ext.extra_jungleFogColor) targetFogColor.set(ext.extra_jungleFogColor);
+                else if (cat === 'mountains' && ext.extra_mistColor) targetFogColor.set(ext.extra_mistColor);
+                else if (cat === 'crystal' && ext.extra_crystalFogColor) targetFogColor.set(ext.extra_crystalFogColor);
+            }
+            scene.fog.color.lerp(targetFogColor, dt * 2);
+        }
+
         starMaterial.opacity += (target.starOp - starMaterial.opacity) * dt * 2;
 
 
@@ -5334,18 +5323,70 @@ initMapUI();
             padOsc: 'sine',
             leadOsc: 'triangle'
         },
-        { 
-            name: "Gentle Breeze", 
+        {
+            name: "Gentle Breeze",
             chords: [
                 [329.63, 415.30, 493.88, 622.25], // Emaj7
                 [277.18, 349.23, 415.30, 554.37], // Dbmaj7
                 [246.94, 311.13, 369.99, 493.88], // Bmaj7
                 [220.00, 277.18, 329.63, 440.00]  // Amaj7
             ],
-            speed: 3000, 
+            speed: 3000,
             stepSpeed: 300,
             padOsc: 'sine',
             leadOsc: 'sine'
+        },
+        {
+            name: "Ocean Lullaby",
+            chords: [
+                [174.61, 220.00, 261.63, 349.23], // Fmaj7
+                [196.00, 246.94, 293.66, 392.00], // G
+                [220.00, 277.18, 329.63, 440.00], // Am
+                [164.81, 207.65, 261.63, 329.63]  // Em7
+            ],
+            speed: 3800,
+            stepSpeed: 475,
+            padOsc: 'sine',
+            leadOsc: 'sine'
+        },
+        {
+            name: "Crystal Caves",
+            chords: [
+                [277.18, 349.23, 415.30, 523.25], // Db
+                [293.66, 369.99, 440.00, 554.37], // Dmaj7
+                [246.94, 311.13, 369.99, 466.16], // Bm
+                [261.63, 311.13, 392.00, 493.88]  // Cm(add9)
+            ],
+            speed: 4200,
+            stepSpeed: 525,
+            padOsc: 'triangle',
+            leadOsc: 'sine'
+        },
+        {
+            name: "Amber Dusk",
+            chords: [
+                [196.00, 246.94, 293.66, 369.99], // Gmaj7
+                [174.61, 220.00, 277.18, 329.63], // Fmaj7#11
+                [146.83, 185.00, 220.00, 277.18], // D
+                [164.81, 196.00, 246.94, 311.13]  // Em
+            ],
+            speed: 2600,
+            stepSpeed: 325,
+            padOsc: 'triangle',
+            leadOsc: 'triangle'
+        },
+        {
+            name: "Meadow Waltz",
+            chords: [
+                [261.63, 329.63, 392.00, 523.25], // C
+                [220.00, 277.18, 329.63, 415.30], // A
+                [174.61, 220.00, 261.63, 349.23], // Fmaj7
+                [196.00, 246.94, 293.66, 392.00]  // G
+            ],
+            speed: 2200,
+            stepSpeed: 275,
+            padOsc: 'sawtooth',
+            leadOsc: 'triangle'
         }
     ];
 
@@ -5451,10 +5492,30 @@ initMapUI();
         musicTimerID = setTimeout(scheduleNotes, 50);
     }
 
+    function updateMusicUI() {
+        const barBtn = document.getElementById('music-bar-toggle');
+        const barName = document.getElementById('music-track-name');
+        const barSkip = document.getElementById('music-bar-skip');
+        if (isMusicPlaying) {
+            document.getElementById('music-toggle').innerText = "⏸ Music";
+            document.getElementById('track-toggle').style.display = "block";
+            barBtn.innerText = '🔊';
+            barName.textContent = tracks[currentTrack].name;
+            barName.style.display = '';
+            barSkip.style.display = '';
+        } else {
+            document.getElementById('music-toggle').innerText = "▶ Music";
+            document.getElementById('track-toggle').style.display = "none";
+            barBtn.innerText = '🔇';
+            barName.style.display = 'none';
+            barSkip.style.display = 'none';
+        }
+    }
+
     document.getElementById('music-toggle').addEventListener('click', () => {
-        initAudio(); 
+        initAudio();
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        
+
         if (!musicGain) {
             musicGain = audioCtx.createGain();
             musicGain.gain.value = 0.5;
@@ -5465,30 +5526,34 @@ initMapUI();
         }
 
         isMusicPlaying = !isMusicPlaying;
-        const trackBtn = document.getElementById('track-toggle');
         if (isMusicPlaying) {
             sequenceTime = 0;
             chordIndex = 0;
             arpIndex = 0;
             nextNoteTime = audioCtx.currentTime + 0.1;
             scheduleNotes();
-            document.getElementById('music-toggle').innerText = "⏸ Music";
-            trackBtn.style.display = "block";
         } else {
             clearTimeout(musicTimerID);
-            document.getElementById('music-toggle').innerText = "▶ Music";
-            trackBtn.style.display = "none";
         }
+        updateMusicUI();
     });
 
     document.getElementById('track-toggle').addEventListener('click', () => {
         currentTrack = (currentTrack + 1) % tracks.length;
         document.getElementById('track-toggle').innerText = "Track: " + tracks[currentTrack].name;
-        
+        document.getElementById('music-track-name').textContent = tracks[currentTrack].name;
+
         sequenceTime = 0;
         chordIndex = 0;
         arpIndex = 0;
         nextNoteTime = audioCtx.currentTime + 0.1;
+    });
+
+    document.getElementById('music-bar-toggle').addEventListener('click', () => {
+        document.getElementById('music-toggle').click();
+    });
+    document.getElementById('music-bar-skip').addEventListener('click', () => {
+        document.getElementById('track-toggle').click();
     });
 
     window.addEventListener('keydown', initAudio, { once: true });
@@ -5507,47 +5572,8 @@ initMapUI();
     currentFrame = 0;
     logicTimer = 0;
 
-    // Atmosphere Editor (Appended to lil-gui)
+    // Atmosphere Editor removed — sky/fog/cloud controls now in Biome Settings per-biome overrides
     if (typeof gui !== 'undefined') {
-        const atmoParams = {
-            skyColor: '#' + envConfigs[0].bg.toString(16).padStart(6, '0'),
-            fogColor: '#' + envConfigs[0].fog.toString(16).padStart(6, '0'),
-            ambColor: '#' + envConfigs[0].amb.toString(16).padStart(6, '0'),
-            dirColor: '#' + envConfigs[0].dir.toString(16).padStart(6, '0'),
-            ambI: envConfigs[0].ambI,
-            dirI: envConfigs[0].dirI,
-            glintCol: '#' + envConfigs[0].glintCol.toString(16).padStart(6, '0')
-        };
-        
-        function updateAtmoParamsFromPhase() {
-            const cur = envConfigs[timePhase];
-            atmoParams.skyColor = '#' + cur.bg.toString(16).padStart(6, '0');
-            atmoParams.fogColor = '#' + cur.fog.toString(16).padStart(6, '0');
-            atmoParams.ambColor = '#' + cur.amb.toString(16).padStart(6, '0');
-            atmoParams.dirColor = '#' + cur.dir.toString(16).padStart(6, '0');
-            atmoParams.ambI = cur.ambI;
-            atmoParams.dirI = cur.dirI;
-            atmoParams.glintCol = '#' + cur.glintCol.toString(16).padStart(6, '0');
-            // Refresh GUI display without triggering onChange
-            if (atmoFolder) {
-                atmoFolder.controllers.forEach(c => c.updateDisplay());
-            }
-        }
-        
-        // Listen to phase changes
-        const oldTimeToggle = document.getElementById('time-toggle').onclick;
-        document.getElementById('time-toggle').addEventListener('click', () => {
-            setTimeout(updateAtmoParamsFromPhase, 50);
-        });
-
-        const atmoFolder = gui.addFolder('Atmosphere');
-        atmoFolder.addColor(atmoParams, 'skyColor').name('Sky Color').onChange(v => envConfigs[timePhase].bg = parseInt(v.replace('#',''), 16));
-        atmoFolder.addColor(atmoParams, 'fogColor').name('Fog Color').onChange(v => envConfigs[timePhase].fog = parseInt(v.replace('#',''), 16));
-        atmoFolder.addColor(atmoParams, 'ambColor').name('Ambient Light').onChange(v => envConfigs[timePhase].amb = parseInt(v.replace('#',''), 16));
-        atmoFolder.addColor(atmoParams, 'dirColor').name('Sun Light').onChange(v => envConfigs[timePhase].dir = parseInt(v.replace('#',''), 16));
-        atmoFolder.add(atmoParams, 'ambI', 0, 3).name('Amb Intensity').onChange(v => envConfigs[timePhase].ambI = v);
-        atmoFolder.add(atmoParams, 'dirI', 0, 5).name('Sun Intensity').onChange(v => envConfigs[timePhase].dirI = v);
-        atmoFolder.addColor(atmoParams, 'glintCol').name('Water Glint').onChange(v => envConfigs[timePhase].glintCol = parseInt(v.replace('#',''), 16));
         
         // 🌙 Dedicated Moonlight & Night Editor
         const moonParams = {
@@ -5561,7 +5587,6 @@ initMapUI();
         };
 
         const moonFolder = gui.addFolder('🌙 Moonlight & Night');
-        moonFolder.add(params, 'exposure', 0.5, 4.0, 0.1).name('☀️ Global Brightness').onChange(v => { renderer.toneMappingExposure = v; });
         moonFolder.addColor(moonParams, 'moonlightColor').name('Moonlight Color').onChange(v => envConfigs[2].dir = parseInt(v.replace('#',''), 16));
         moonFolder.add(moonParams, 'moonlightIntensity', 0, 10, 0.1).name('Moonlight Power').onChange(v => envConfigs[2].dirI = v);
         moonFolder.addColor(moonParams, 'nightAmbColor').name('Night Fill Color').onChange(v => envConfigs[2].amb = parseInt(v.replace('#',''), 16));
@@ -5631,16 +5656,7 @@ initMapUI();
             oldCloudColors[idx] = newHexVal;
         }
 
-        const cloudFolder = gui.addFolder('Cloud Editor');
-        cloudFolder.addColor(cloudParams, 'c0').name('Color 1').onChange(v => updateCloudColorForIndex(0, v));
-        cloudFolder.addColor(cloudParams, 'c1').name('Color 2').onChange(v => updateCloudColorForIndex(1, v));
-        cloudFolder.addColor(cloudParams, 'c2').name('Color 3').onChange(v => updateCloudColorForIndex(2, v));
-        cloudFolder.addColor(cloudParams, 'c3').name('Color 4').onChange(v => updateCloudColorForIndex(3, v));
-        cloudFolder.addColor(cloudParams, 'c4').name('Color 5').onChange(v => updateCloudColorForIndex(4, v));
-        cloudFolder.add(cloudParams, 'opBase', 0, 1).name('Base Opacity').onChange(v => matCloud.opacity = v);
-        cloudFolder.add(cloudParams, 'opHigh', 0, 1).name('High Opacity').onChange(v => highCloudMat.opacity = v);
-        cloudFolder.add(cloudParams, 'opWispy', 0, 1).name('Wispy Opacity').onChange(v => matWispyCloud.opacity = v);
-        cloudFolder.add(cloudParams, 'opMega', 0, 1).name('Mega Opacity').onChange(v => megaCloudMat.opacity = v);
+        // Cloud Editor removed — cloud controls now in Biome Settings > Clouds
 
         // Tree Editor
         let oldTreeColors = [...treeGreenVariations];
@@ -5666,15 +5682,7 @@ initMapUI();
             oldTreeColors[idx] = newHexVal;
         }
 
-        const treeFolder = gui.addFolder('Tree Editor');
-        treeFolder.add(params, 'treeScale', 0.5, 4.0).name('Tree Scale').onChange(v => treeUniforms.uTreeScale.value = v);
-        treeFolder.addColor(params, 'treeColor0').name('Color 1').onChange(v => updateTreeColorForIndex(0, v));
-        treeFolder.addColor(params, 'treeColor1').name('Color 2').onChange(v => updateTreeColorForIndex(1, v));
-        treeFolder.addColor(params, 'treeColor2').name('Color 3').onChange(v => updateTreeColorForIndex(2, v));
-        treeFolder.addColor(params, 'treeColor3').name('Color 4').onChange(v => updateTreeColorForIndex(3, v));
-        treeFolder.addColor(params, 'treeColor4').name('Color 5').onChange(v => updateTreeColorForIndex(4, v));
-        treeFolder.addColor(params, 'treeColor5').name('Color 6').onChange(v => updateTreeColorForIndex(5, v));
-        treeFolder.addColor(params, 'treeColor6').name('Color 7').onChange(v => updateTreeColorForIndex(6, v));
+        // Tree Editor removed — tree controls now in main Trees folder + per-biome editors
 
         // ==========================================
         // SYSTEM SETTINGS (SAVE/LOAD)

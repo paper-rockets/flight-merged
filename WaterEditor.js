@@ -52,6 +52,9 @@ export function initWaterEditor(getWaterUniformsCallback, updateBiomeSettingsCal
     bindSlider('waterOpacity', 'uWaterOpacity', 1/100);
     bindSlider('chopPatchiness', 'uChopPatchiness', 1/100);
     bindSlider('waveTurbulence', 'uDetailAmount', 1/100);
+    bindSlider('windDirection', 'uWindDir', 1);
+    bindSlider('directionalSpread', 'uDirSpread', 1/100);
+    bindSlider('waveChop', 'uChop', 1/100);
 
     // Spectrum
     const spectrumContainer = editorEl.querySelector('#spectrumContainer');

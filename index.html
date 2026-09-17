@@ -2590,31 +2590,27 @@ let isInitializingGui = true;
             `#include <color_fragment>`,
             `#include <color_fragment>
 
-            // ── Approximate terrain depth below water surface ───────────────
-            float approxH = snoise(vWorldPos.xz * 0.003) * 20.0
-                          + snoise(vWorldPos.xz * 0.009 + vec2(3.1, 7.4)) * 7.0;
-            float waterDepth = max(0.0, 2.4 - approxH);
+            // ── Base: keep material cyan, subtle far-distance darkening ──────
+            diffuseColor.rgb = vec3(0.00, 0.78, 0.80);
+            float camDist = length(vWorldPos.xz - cameraPosition.xz);
+            float farFade = smoothstep(80.0, 500.0, camDist);
+            diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.45, farFade);
 
-            // ── Beer's law: cyan shallow → navy deep ────────────────────────
-            vec3 shallowCol = vec3(0.00, 0.80, 0.85);   // bright cyan
-            vec3 deepCol    = vec3(0.00, 0.22, 0.48);   // dark navy
-            float depthT    = 1.0 - exp(-waterDepth * 0.10);
-            diffuseColor.rgb = mix(shallowCol, deepCol, depthT);
-
-            // ── Caustics brightest in shallow areas ─────────────────────────
+            // ── Caustics ────────────────────────────────────────────────────
             vec2 cuv = vWorldPos.xz * 0.10;
             float c1 = 1.0 - abs(snoise(cuv + vec2( uTime*0.10,  uTime*0.05)));
             float c2 = 1.0 - abs(snoise(cuv * 1.5 - vec2(uTime*0.15, -uTime*0.05)));
             float caustics = clamp(pow(c1, 6.0) + pow(c2, 5.5)*0.5, 0.0, 1.0);
-            caustics *= (1.0 - depthT * 0.85);
-            diffuseColor.rgb += vec3(0.15, 0.25, 0.20) * caustics;
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.97, 1.0), caustics * 0.4);
 
-            // ── Shore foam: wide white band at waterline ────────────────────
-            float rawFoam = 1.0 - smoothstep(0.0, 6.0, max(0.0, waterDepth - 0.3));
-            float foamN1  = snoise(vWorldPos.xz * 0.30 + vec2( uTime*0.20, -uTime*0.15));
-            float foamN2  = snoise(vWorldPos.xz * 0.65 - vec2(-uTime*0.12,  uTime*0.18));
-            float foam    = rawFoam * smoothstep(0.0, 0.6, foamN1) * smoothstep(0.0, 0.6, foamN2);
-            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 1.0, 1.0), foam * 0.90);
+            // ── Shore foam: noise patches that look like water edge ──────────
+            float foamN1 = snoise(vWorldPos.xz * 0.28 + vec2( uTime*0.18, -uTime*0.13));
+            float foamN2 = snoise(vWorldPos.xz * 0.60 - vec2(-uTime*0.11,  uTime*0.16));
+            float foamN3 = snoise(vWorldPos.xz * 0.12 + vec2( uTime*0.07,  uTime*0.05));
+            float foam   = smoothstep(0.3, 0.7, foamN1)
+                         * smoothstep(0.2, 0.6, foamN2)
+                         * smoothstep(0.0, 0.5, foamN3);
+            diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 1.0, 1.0), foam * 0.85);
             `
         );
     };

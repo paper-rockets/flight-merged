@@ -64,6 +64,16 @@
       box-shadow: 0 10px 40px rgba(40, 30, 10, 0.45);
     }
     #map-frame { position: relative; }
+    #map-toggle-btn {
+      position: absolute; top: 4px; right: 4px; z-index: 2;
+      width: 22px; height: 22px; padding: 0;
+      background: rgba(0,0,0,0.38); border: none; border-radius: 5px;
+      color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity 0.15s;
+    }
+    #map-frame:hover #map-toggle-btn,
+    #world-map.map-open #map-toggle-btn { opacity: 1; }
+    #world-map.map-open #map-toggle-btn { top: 6px; right: 6px; width: 26px; height: 26px; background: rgba(0,0,0,0.5); }
     #map-canvas {
       display: block; width: 150px; height: 150px;
       border-radius: 7px; cursor: pointer;
@@ -243,6 +253,9 @@ console.error = function(...args) {
     <div id="map-frame">
       <canvas id="map-canvas" width="150" height="150"></canvas>
       <div id="map-tooltip"></div>
+      <button id="map-toggle-btn" title="Expand map" aria-label="Expand map">
+        <svg id="map-toggle-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
     </div>
     <div id="map-place"><span id="map-biome-badge"></span><span id="map-coords-text" hidden></span></div>
   </div>
@@ -458,12 +471,26 @@ let isInitializingGui = true;
         _hoverMapPos = null;
         if (_mapTooltip) _mapTooltip.style.display = 'none';
         _drawWorldMap(true);
+        const icon = document.getElementById('map-toggle-icon');
+        const btn  = document.getElementById('map-toggle-btn');
+        if (btn) btn.title = open ? 'Minimize map' : 'Expand map';
+        if (icon) icon.innerHTML = open
+            ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'   // × close
+            : '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>'; // expand
     }
 
     function initMapUI() {
         _mapEl = document.getElementById('world-map');
         _mapCanvas = document.getElementById('map-canvas');
         _mapTooltip = document.getElementById('map-tooltip');
+
+        const _mapToggleBtn = document.getElementById('map-toggle-btn');
+        if (_mapToggleBtn) {
+            _mapToggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                _setMapOpen(!_mapOpen);
+            });
+        }
 
         if (_mapCanvas) {
             _mapCtx = _mapCanvas.getContext('2d');
@@ -765,9 +792,9 @@ let isInitializingGui = true;
         godRays: !LOW_GFX,
         godRayIntensity: 0.34,
         godRayDensity: 0.40,
-        godRayDecay: 0.92,
+        godRayDecay: 0.88,
         godRayWeight: 0.80,
-        lumMin: 0.90,
+        lumMin: 0.94,
         lumMax: 0.99,
         rayColorInner: '#ffea9f',
         rayColorOuter: '#ff9933',
@@ -1379,10 +1406,10 @@ let isInitializingGui = true;
             tDiffuse: { value: null },
             uSunScreenPos: { value: new THREE.Vector2(0.5, 0.5) },
             uIntensity: { value: 0.34 },
-            uDecay: { value: 0.92 },
+            uDecay: { value: 0.88 },
             uDensity: { value: 0.40 },
             uWeight: { value: 0.80 },
-            uLumMin: { value: 0.90 },
+            uLumMin: { value: 0.94 },
             uLumMax: { value: 0.99 },
             uRayColorInner: { value: new THREE.Color('#ffea9f') },
             uRayColorOuter: { value: new THREE.Color('#ff9933') },

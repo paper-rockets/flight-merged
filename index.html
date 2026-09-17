@@ -76,11 +76,16 @@
     #world-map.map-open #map-toggle-btn { top: 6px; right: 6px; width: 26px; height: 26px; background: rgba(0,0,0,0.5); }
     #map-canvas {
       display: block; width: 150px; height: 150px;
-      border-radius: 7px; cursor: pointer;
+      border-radius: 50%; cursor: pointer;
     }
     #world-map.map-open #map-canvas {
-      width: min(460px, 82vw, 76vh); height: min(460px, 82vw, 76vh); cursor: crosshair;
+      width: min(460px, 82vw, 76vh); height: min(460px, 82vw, 76vh);
+      border-radius: 10px; cursor: crosshair;
     }
+    #world-map.map-compass {
+      background: transparent; box-shadow: none; padding: 0;
+    }
+    #world-map.map-compass #map-place { color: rgba(200,215,255,0.75); }
     #map-place {
       font: italic 600 11px Georgia, 'Times New Roman', serif; color: #5b4a30;
       text-align: center; margin-top: 2px; white-space: nowrap;
@@ -468,6 +473,7 @@ let isInitializingGui = true;
         _mapOpen = open;
         if (!_mapEl) return;
         _mapEl.classList.toggle('map-open', open);
+        _mapEl.classList.toggle('map-compass', !open);
         _hoverMapPos = null;
         if (_mapTooltip) _mapTooltip.style.display = 'none';
         _drawWorldMap(true);
@@ -475,14 +481,16 @@ let isInitializingGui = true;
         const btn  = document.getElementById('map-toggle-btn');
         if (btn) btn.title = open ? 'Minimize map' : 'Expand map';
         if (icon) icon.innerHTML = open
-            ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'   // × close
-            : '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>'; // expand
+            ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
+            : '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>';
     }
 
     function initMapUI() {
         _mapEl = document.getElementById('world-map');
         _mapCanvas = document.getElementById('map-canvas');
         _mapTooltip = document.getElementById('map-tooltip');
+
+        if (_mapEl) _mapEl.classList.add('map-compass');
 
         const _mapToggleBtn = document.getElementById('map-toggle-btn');
         if (_mapToggleBtn) {
@@ -696,10 +704,89 @@ let isInitializingGui = true;
         });
     }
 
+    function _drawCompass() {
+        if (!_mapCanvas) _mapCanvas = document.getElementById('map-canvas');
+        if (_mapCanvas && !_mapCtx) _mapCtx = _mapCanvas.getContext('2d');
+        if (!_mapCanvas || !_mapCtx) return;
+        const rect = _mapCanvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const wantW = Math.max(1, Math.round(rect.width * dpr));
+        const wantH = Math.max(1, Math.round(rect.height * dpr));
+        if (_mapCanvas.width !== wantW || _mapCanvas.height !== wantH) { _mapCanvas.width = wantW; _mapCanvas.height = wantH; }
+        const W = _mapCanvas.width, H = _mapCanvas.height;
+        const cx = W / 2, cy = H / 2, r = Math.min(cx, cy) * 0.96;
+        const yaw = typeof currentYaw !== 'undefined' ? currentYaw : 0;
+        const ctx = _mapCtx;
+        ctx.clearRect(0, 0, W, H);
+
+        // Background
+        const bg = ctx.createRadialGradient(cx, cy * 0.75, 0, cx, cy, r);
+        bg.addColorStop(0, 'rgba(32, 44, 72, 0.97)');
+        bg.addColorStop(1, 'rgba(10, 15, 28, 0.99)');
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = bg; ctx.fill();
+
+        // Outer ring
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(160, 200, 255, 0.22)';
+        ctx.lineWidth = 1.5 * dpr; ctx.stroke();
+
+        // Rotating rose
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(-yaw);
+
+        // Inner tick ring
+        ctx.beginPath(); ctx.arc(0, 0, r * 0.68, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(160,200,255,0.1)'; ctx.lineWidth = dpr; ctx.stroke();
+
+        for (let i = 0; i < 32; i++) {
+            const angle = (i / 32) * Math.PI * 2;
+            const isCard = i % 8 === 0, isOrd = i % 4 === 0 && !isCard;
+            const outerR = r * 0.93;
+            const tickLen = isCard ? r * 0.22 : (isOrd ? r * 0.13 : r * 0.07);
+            ctx.save();
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, -outerR); ctx.lineTo(0, -(outerR - tickLen));
+            ctx.strokeStyle = (isCard && i === 0) ? 'rgba(220,60,60,0.95)' : (isCard ? 'rgba(220,230,255,0.8)' : 'rgba(255,255,255,0.28)');
+            ctx.lineWidth = (isCard ? 2 : (isOrd ? 1.2 : 0.7)) * dpr;
+            ctx.stroke();
+            if (isCard) {
+                const labels = ['N','E','S','W'];
+                ctx.fillStyle = i === 0 ? '#e74c3c' : 'rgba(210,225,255,0.92)';
+                ctx.font = `bold ${Math.round(r * 0.2)}px -apple-system,BlinkMacSystemFont,sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(labels[i / 8], 0, -(outerR - r * 0.36));
+            }
+            ctx.restore();
+        }
+        ctx.restore();
+
+        // Fixed gold heading triangle at 12-o'clock
+        const triY = -(r * 0.87);
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.beginPath();
+        ctx.moveTo(0, triY - 5 * dpr);
+        ctx.lineTo(5 * dpr, triY + 5 * dpr);
+        ctx.lineTo(-5 * dpr, triY + 5 * dpr);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 215, 60, 0.95)'; ctx.fill();
+        ctx.restore();
+
+        // Center cap
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.beginPath(); ctx.arc(0, 0, 4 * dpr, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(200,220,255,0.7)'; ctx.fill();
+        ctx.restore();
+    }
+
     function _drawWorldMap(force) {
         const now = performance.now();
-        if (!force && now - _lastMapDrawTime < 66) return; // ~15 updates per second is plenty
+        if (!force && now - _lastMapDrawTime < 66) return;
         _lastMapDrawTime = now;
+
+        if (!_mapOpen) { _drawCompass(); return; }
 
         if (!_mapCanvas) _mapCanvas = document.getElementById('map-canvas');
         if (_mapCanvas && !_mapCtx) _mapCtx = _mapCanvas.getContext('2d');
@@ -2485,74 +2572,123 @@ let isInitializingGui = true;
     let waterMesh;
 
 
-    const waterGeo = new THREE.PlaneGeometry(5000, 5000);
+    // More segments so vertex waves look smooth; LOW_GFX halves them
+    const WATER_SEGS = LOW_GFX ? 24 : 48;
+    const waterGeo = new THREE.PlaneGeometry(5000, 5000, WATER_SEGS, WATER_SEGS);
     waterGeo.rotateX(-Math.PI / 2);
 
     const waterUniforms = {
-        uTime: { value: 0 }
+        uTime:      { value: 0 },
+        uPlayerPos: { value: new THREE.Vector3() }
     };
 
     const waterMat = new THREE.MeshStandardMaterial({
         color: 0x4da9e8,
         transparent: false,
         opacity: 1.0,
-        roughness: 0.1,
-        metalness: 0.2
+        roughness: 0.08,
+        metalness: 0.15
     });
 
     waterMat.onBeforeCompile = (shader) => {
-        shader.uniforms.uTime = waterUniforms.uTime;
+        shader.uniforms.uTime      = waterUniforms.uTime;
+        shader.uniforms.uPlayerPos = waterUniforms.uPlayerPos;
 
+        // ── Vertex shader: pass world pos + gentle wave displacement ────────
         shader.vertexShader = `
+            uniform float uTime;
             varying vec3 vWorldPos;
         ` + shader.vertexShader;
 
         shader.vertexShader = shader.vertexShader.replace(
-            `#include <worldpos_vertex>`,
-            `#include <worldpos_vertex>
-             vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
+            `#include <begin_vertex>`,
+            `#include <begin_vertex>
+             // Layered sine-wave displacement (model-space Y is up for a rotated plane)
+             float wx = position.x * 0.022 + uTime * 1.05;
+             float wz = position.z * 0.028 - uTime * 0.82;
+             float wx2 = (position.x + position.z) * 0.015 + uTime * 0.6;
+             transformed.y += sin(wx) * 0.42 + sin(wz) * 0.32 + sin(wx2) * 0.22;`
         );
 
+        shader.vertexShader = shader.vertexShader.replace(
+            `#include <worldpos_vertex>`,
+            `#include <worldpos_vertex>
+             vWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;`
+        );
+
+        // ── Fragment shader: Beer's law + Fresnel + caustics + shore foam ───
         shader.fragmentShader = `
             uniform float uTime;
-            varying vec3 vWorldPos;
+            uniform vec3  uPlayerPos;
+            varying vec3  vWorldPos;
 
-            vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+            vec3 w_permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
             float snoise(vec2 v){
-                const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
-                vec2 i  = floor(v + dot(v, C.yy) );
-                vec2 x0 = v -   i + dot(i, C.xx);
-                vec2 i1; i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                const vec4 C = vec4(0.211324865405187,0.366025403784439,-0.577350269189626,0.024390243902439);
+                vec2 i  = floor(v + dot(v, C.yy));
+                vec2 x0 = v - i + dot(i, C.xx);
+                vec2 i1 = (x0.x > x0.y) ? vec2(1.0,0.0) : vec2(0.0,1.0);
                 vec4 x12 = x0.xyxy + C.xxzz; x12.xy -= i1;
                 i = mod(i, 289.0);
-                vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
-                vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-                m = m*m ; m = m*m ;
-                vec3 x = 2.0 * fract(p * C.www) - 1.0; vec3 h = abs(x) - 0.5; vec3 ox = floor(x + 0.5);
-                vec3 a0 = x - ox; m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
-                vec3 g; g.x  = a0.x  * x0.x  + h.x  * x0.y; g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-                return 130.0 * dot(m, g);
+                vec3 p = w_permute(w_permute(i.y+vec3(0.0,i1.y,1.0))+i.x+vec3(0.0,i1.x,1.0));
+                vec3 m = max(0.5-vec3(dot(x0,x0),dot(x12.xy,x12.xy),dot(x12.zw,x12.zw)),0.0);
+                m = m*m; m = m*m;
+                vec3 x = 2.0*fract(p*C.www)-1.0; vec3 h = abs(x)-0.5; vec3 ox = floor(x+0.5);
+                vec3 a0 = x-ox; m *= 1.79284291400159-0.85373472095314*(a0*a0+h*h);
+                vec3 g; g.x=a0.x*x0.x+h.x*x0.y; g.yz=a0.yz*x12.xz+h.yz*x12.yw;
+                return 130.0*dot(m,g);
             }
         ` + shader.fragmentShader;
 
         shader.fragmentShader = shader.fragmentShader.replace(
             `#include <color_fragment>`,
             `#include <color_fragment>
-             vec2 uv = vWorldPos.xz * 0.1; // Much smaller, more tightly packed ripples
-             float n1 = 1.0 - abs(snoise(uv + vec2(uTime * 0.1, uTime * 0.05)));
-             float n2 = 1.0 - abs(snoise(uv * 1.5 - vec2(uTime * 0.15, -uTime * 0.05)));
-             float caustics = pow(n1, 6.0) + pow(n2, 6.0) * 0.5;
 
-             // Fade out ripples on inland rivers and small lakes perfectly
-             float simpleTerrainH = snoise(vWorldPos.xz * 0.003) * 15.0;
-             float deepWater = smoothstep(-0.5, -4.0, simpleTerrainH);
+            // ── approximate terrain height (two octaves, same bias as terrain) ──
+            float approxH = snoise(vWorldPos.xz * 0.003) * 20.0
+                          + snoise(vWorldPos.xz * 0.009 + vec2(3.1, 7.4)) * 7.0;
+            float waterDepth = max(0.0, 2.4 - approxH); // 2.4 = waterMesh Y
 
-             caustics = clamp(caustics, 0.0, 1.0) * deepWater;
-             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.95, 1.0), caustics * 0.5);
+            // ── Beer's law depth colour ─────────────────────────────────────
+            vec3 shallowCol = vec3(0.36, 0.78, 0.92);  // turquoise near shore
+            vec3 deepCol    = vec3(0.04, 0.17, 0.44);  // deep ocean blue
+            float depthFactor = 1.0 - exp(-waterDepth * 0.085);
+            vec3 waterCol = mix(shallowCol, deepCol, depthFactor);
 
-             float dist = length(vWorldPos.xz - cameraPosition.xz);
-             float depthFade = smoothstep(50.0, 350.0, dist);
-             diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.2, depthFade);
+            // ── Fresnel: reflect sky at grazing angles ──────────────────────
+            vec3 viewDir = normalize(cameraPosition - vWorldPos);
+            float fresnelVal = pow(1.0 - max(0.0, dot(vec3(0.0,1.0,0.0), viewDir)), 4.0);
+            vec3 skyTint = vec3(0.44, 0.68, 0.96);
+            waterCol = mix(waterCol, skyTint, fresnelVal * 0.55);
+
+            // ── Caustics (brightest in shallow water) ──────────────────────
+            vec2 cuv = vWorldPos.xz * 0.10;
+            float c1 = 1.0 - abs(snoise(cuv  + vec2( uTime*0.10,  uTime*0.05)));
+            float c2 = 1.0 - abs(snoise(cuv  * 1.5 - vec2(uTime*0.15, -uTime*0.05)));
+            float c3 = 1.0 - abs(snoise(cuv  * 0.7 + vec2(-uTime*0.07, uTime*0.09)));
+            float caustics = (pow(c1,6.0) + pow(c2,5.5)*0.6 + pow(c3,7.0)*0.35);
+            caustics = clamp(caustics, 0.0, 1.0) * (1.0 - depthFactor * 0.8);
+            waterCol += vec3(0.22, 0.26, 0.18) * caustics * 0.45;
+
+            // ── Shore foam ─────────────────────────────────────────────────
+            float shoreDist   = max(0.0, waterDepth - 0.8);
+            float rawFoam     = 1.0 - smoothstep(0.0, 5.0, shoreDist);
+            float foamN1      = snoise(vWorldPos.xz * 0.35 + vec2( uTime*0.22, -uTime*0.17));
+            float foamN2      = snoise(vWorldPos.xz * 0.70 - vec2(-uTime*0.13,  uTime*0.20));
+            float foam        = rawFoam * smoothstep(-0.1, 0.5, foamN1)
+                                        * smoothstep(-0.1, 0.5, foamN2);
+
+            // ── Player ripples ─────────────────────────────────────────────
+            float playerDist  = length(vWorldPos.xz - uPlayerPos.xz);
+            float playerDepth = abs(vWorldPos.y - uPlayerPos.y);
+            float pInfl       = smoothstep(1.8, 0.0, playerDepth)
+                              * smoothstep(22.0, 0.0, playerDist);
+            float pWave       = pow(0.5 + 0.5*sin(playerDist*0.55 - uTime*5.5), 5.0) * pInfl;
+            foam              = clamp(foam + pWave * 0.7, 0.0, 1.0);
+
+            waterCol = mix(waterCol, vec3(0.94, 0.97, 1.0), foam * 0.88);
+
+            diffuseColor.rgb = waterCol;
             `
         );
     };

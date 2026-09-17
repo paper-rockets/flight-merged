@@ -13,23 +13,23 @@
       margin: 0; padding: 0; width: 100%; height: 100%;
       overflow: hidden; background: #62b1e8;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      touch-action: none; 
+      touch-action: none;
       user-select: none;
     }
     #app { position: fixed; inset: 0; touch-action: none; }
     canvas { display: block; touch-action: none; }
-    
+
     #touch-controls {
       position: fixed; inset: 0; z-index: 20; pointer-events: none;
     }
-    
+
     #joystick-base {
       position: absolute; left: 40px; bottom: 40px;
       width: 100px; height: 100px; border-radius: 50%;
       background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
       pointer-events: auto;
     }
-    
+
     #joystick-knob {
       position: absolute; left: 50%; top: 50%;
       width: 40px; height: 40px; border-radius: 50%;
@@ -51,8 +51,42 @@
       z-index: 20;
     }
 
+    #world-map {
+      position: fixed; left: 14px; bottom: 14px; z-index: 15;
+      padding: 5px 5px 3px; border-radius: 10px;
+      background: #efe4c8; box-shadow: 0 2px 8px rgba(40, 30, 10, 0.28);
+      opacity: 0.82; transition: opacity 0.2s;
+    }
+    #world-map:hover, #world-map.map-open { opacity: 1; }
+    #world-map.map-open {
+      left: 50%; bottom: 50%; transform: translate(-50%, 50%);
+      z-index: 40; padding: 8px 8px 5px;
+      box-shadow: 0 10px 40px rgba(40, 30, 10, 0.45);
+    }
+    #map-frame { position: relative; }
+    #map-canvas {
+      display: block; width: 150px; height: 150px;
+      border-radius: 7px; cursor: pointer;
+    }
+    #world-map.map-open #map-canvas {
+      width: min(460px, 82vw, 76vh); height: min(460px, 82vw, 76vh); cursor: crosshair;
+    }
+    #map-place {
+      font: italic 600 11px Georgia, 'Times New Roman', serif; color: #5b4a30;
+      text-align: center; margin-top: 2px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; max-width: 150px;
+    }
+    #world-map.map-open #map-place { max-width: none; font-size: 13px; }
+    #map-tooltip {
+      position: absolute; display: none; pointer-events: none;
+      transform: translate(-50%, -135%); white-space: nowrap;
+      background: #fbf6e8; color: #4a3b24; border-radius: 5px; padding: 3px 7px;
+      font: 600 12px Georgia, 'Times New Roman', serif;
+      box-shadow: 0 2px 6px rgba(40, 30, 10, 0.3);
+    }
     @media (max-width: 768px) {
-      #world-map { display: none !important; }
+      #map-canvas { width: 110px; height: 110px; }
+      #map-place { display: none; }
     }
 
     #ui-stack {
@@ -100,7 +134,7 @@ console.error = function(...args) {
 </script>
   <div id="app"></div>
 
-  
+
   <div id="top-bar" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px;">
     <button id="pause-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">⏸</button>
     <div id="fps-counter" style="color: #fff; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none;">0 FPS</div>
@@ -109,30 +143,16 @@ console.error = function(...args) {
     <button id="gui-toggle-btn" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-left: 6px;">⚙️ Settings (H)</button>
   </div>
 
-  <!-- Mini-map overlay (Dark Translucent Cyber/Fantasy Glass Theme) -->
-  <div id="world-map" style="position: fixed; bottom: 20px; left: 20px; z-index: 15; background: rgba(11, 19, 36, 0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-radius: 10px; padding: 10px 12px; border: 1px solid rgba(56, 189, 248, 0.35); width: 396px; box-sizing: border-box; box-shadow: 0 16px 45px rgba(0, 0, 0, 0.7), 0 0 25px rgba(56, 189, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12);">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <span style="font-size: 11px; color: #38bdf8;">🧭</span>
-        <span style="color: #f8fafc; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">Navigational Chart</span>
-        <span style="color: #38bdf8; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 9px; letter-spacing: 0.5px; text-transform: uppercase;">• 2D Map</span>
-      </div>
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <span style="color: #38bdf8; font-family: ui-monospace, SFMono-Regular, monospace; font-size: 9px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 4px; padding: 2px 6px; letter-spacing: 0.3px; text-transform: uppercase;">Click to fly</span>
-        <button id="close-map-btn" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); color: #94a3b8; font-size: 10px; cursor: pointer; padding: 2px 6px; border-radius: 4px; line-height: 1; transition: all 0.15s;" onmouseover="this.style.color='#f87171';this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.color='#94a3b8';this.style.background='rgba(255,255,255,0.08)'" title="Hide Map">✕</button>
-      </div>
+  <!-- Mini-map: small paper map in the corner; click (or M) opens the big map, click a spot there to fly -->
+  <div id="world-map" title="Map (M)">
+    <div id="map-frame">
+      <canvas id="map-canvas" width="150" height="150"></canvas>
+      <div id="map-tooltip"></div>
     </div>
-    <div style="position: relative; width: 372px; height: 260px; margin: 0 auto;">
-      <canvas id="map-canvas" width="372" height="260" style="display: block; border-radius: 6px; border: 1px solid rgba(56, 189, 248, 0.25); background: #081020; cursor: crosshair;"></canvas>
-      <div id="map-tooltip" style="position: absolute; display: none; pointer-events: none; background: rgba(11, 19, 36, 0.95); backdrop-filter: blur(8px); border: 1px solid rgba(56, 189, 248, 0.5); border-radius: 4px; padding: 4px 8px; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 10px; color: #f8fafc; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.6); transform: translate(-50%, -125%); z-index: 20;"></div>
-    </div>
-    <div id="map-info-text" style="color: #94a3b8; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(56, 189, 248, 0.20); display: flex; justify-content: space-between; align-items: center;">
-      <span id="map-coords-text" style="color: #38bdf8;">X: 0m | Z: 0m | ALT: 0m</span>
-      <span id="map-biome-badge" style="color: #f1f5f9; font-weight: 700; font-size: 10px;">🌊 Archipelago</span>
-    </div>
+    <div id="map-place"><span id="map-biome-badge"></span><span id="map-coords-text" hidden></span></div>
   </div>
 
-  
+
 
   <div id="hidden-ui" style="display: none;">
       <button id="editor-toggle">Terrain Editor</button>
@@ -147,8 +167,8 @@ console.error = function(...args) {
   </div>
 
 
-  
-  
+
+
   <div id="photo-mode-ui">
     <span>Photo Mode</span>
     <button id="photo-capture">Capture</button>
@@ -156,7 +176,7 @@ console.error = function(...args) {
   </div>
 
 
-  
+
   <!-- Crystal Editor UI -->
   <div id="crystal-editor" style="display: none; position: fixed; left: 20px; top: 20px; width: 240px; box-sizing: border-box; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); color: white; padding: 15px; border-radius: 10px; font-family: sans-serif; z-index: 100; max-height: 80vh; overflow-y: auto; border: 1px solid rgba(255,255,255,0.2);">
     <h3 style="margin-top:0; margin-bottom:10px; font-size:16px;">💎 Crystal & Env Editor</h3>
@@ -198,7 +218,7 @@ console.error = function(...args) {
     <div id="joystick-base"><div id="joystick-knob"></div></div>
     <div id="boost-btn">BOOST</div>
   </div>
-  
+
   <div id="pc-controls-hint" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: white; padding: 10px 20px; border-radius: 8px; font-family: sans-serif; pointer-events: none; z-index: 100;">
     Controls: WASD/Arrows to move, Shift to Boost, Space to Brake, Scroll Wheel to Zoom
   </div>
@@ -258,14 +278,18 @@ import { WorldLayout, BIOME_CATALOG, OCEAN_BIOME } from './world-layout.js';
     let cameraZoomDist = 12.0;
     let currentFrame = 0;
     let logicTimer = 0;
-    let terrainRes = LOW_GFX ? 64 : 128;
+    let terrainRes = LOW_GFX ? 128 : 256;
+    const TERRAIN_SIZE = 3200; // ground patch that follows the player (12.5m vertex spacing at 256)
 let isInitializingGui = true;
 
             // PROCEDURAL NOISE & MULTI-BIOMES SETUP
     // ==========================================
+    // Simplex needs the table twice in a row (perm[i + 256] === perm[i]); independent values in the
+    // second half made the noise jump at lattice wraps — the source of cliff walls and saw-tooth edges.
     const perm = new Uint8Array(512);
-    for (let i = 0; i < 512; i++) perm[i] = Math.floor(Math.random() * 255);
-    
+    for (let i = 0; i < 256; i++) perm[i] = Math.floor(Math.random() * 256);
+    for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
+
     function snoise(x, z) {
         let n0, n1, n2;
         const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
@@ -330,24 +354,35 @@ let isInitializingGui = true;
     let _bgMapCanvas = null;
     let _lastMapDrawTime = 0;
     let _hoverMapPos = null;
+    let _mapOpen = false;
+
+    function _setMapOpen(open) {
+        _mapOpen = open;
+        if (!_mapEl) return;
+        _mapEl.classList.toggle('map-open', open);
+        _hoverMapPos = null;
+        if (_mapTooltip) _mapTooltip.style.display = 'none';
+        _drawWorldMap(true);
+    }
 
     function initMapUI() {
         _mapEl = document.getElementById('world-map');
         _mapCanvas = document.getElementById('map-canvas');
         _mapTooltip = document.getElementById('map-tooltip');
-        
+
         if (_mapCanvas) {
             _mapCtx = _mapCanvas.getContext('2d');
-            
+
             _mapCanvas.addEventListener('mousemove', (e) => {
+                if (!_mapOpen) return;
                 const rect = _mapCanvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 _hoverMapPos = { x: mouseX, y: mouseY };
 
-                const worldExtent = worldLayout.worldBounds * 1.08;
-                const targetX = ((mouseX / rect.width) - 0.5) * 2.0 * worldExtent;
-                const targetZ = ((mouseY / rect.height) - 0.5) * 2.0 * worldExtent;
+                const view = _mapView();
+                const targetX = view.cx + ((mouseX / rect.width) - 0.5) * 2.0 * view.half;
+                const targetZ = view.cz + ((mouseY / rect.height) - 0.5) * 2.0 * view.half;
 
                 const b = getBiomeAt(targetX, targetZ);
                 const isNearCapyHaven = Math.hypot(targetX - (-1200), targetZ - (-800)) < 400;
@@ -362,13 +397,8 @@ let isInitializingGui = true;
                     _mapTooltip.style.display = 'block';
                     _mapTooltip.style.left = `${mouseX}px`;
                     _mapTooltip.style.top = `${mouseY}px`;
-                    if (isNearCapyHaven) {
-                        _mapTooltip.innerHTML = `<strong style="color:#fbbf24;">🦫 Capybara Haven</strong><span style="color:#94a3b8; margin-left:6px;">${distKm} km • Click to visit</span>`;
-                    } else if (b && (b.id === 'crystal_land' || b.name.includes('Crystal'))) {
-                        _mapTooltip.innerHTML = `<strong style="color:#38bdf8;">💎 Crystal Spires</strong><span style="color:#94a3b8; margin-left:6px;">${distKm} km • Click to fly</span>`;
-                    } else {
-                        _mapTooltip.innerHTML = `<strong>${b ? b.name : '🌊 Open Ocean'}</strong><span style="color:#94a3b8; margin-left:6px;">${distKm} km • Click to fly</span>`;
-                    }
+                    const place = isNearCapyHaven ? 'Capybara Haven' : (b && !b.isOcean ? _mapName(b) : 'Open sea');
+                    _mapTooltip.textContent = `${place} · ${distKm} km`;
                 }
             });
 
@@ -378,13 +408,15 @@ let isInitializingGui = true;
             });
 
             _mapCanvas.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!_mapOpen) { _setMapOpen(true); return; }
                 const rect = _mapCanvas.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
 
-                const worldExtent = worldLayout.worldBounds * 1.08;
-                const targetX = ((mouseX / rect.width) - 0.5) * 2.0 * worldExtent;
-                const targetZ = ((mouseY / rect.height) - 0.5) * 2.0 * worldExtent;
+                const view = _mapView();
+                const targetX = view.cx + ((mouseX / rect.width) - 0.5) * 2.0 * view.half;
+                const targetZ = view.cz + ((mouseY / rect.height) - 0.5) * 2.0 * view.half;
 
                 if (typeof playerGrp !== 'undefined') {
                     const targetGroundY = getWorldHeight(targetX, targetZ);
@@ -400,16 +432,18 @@ let isInitializingGui = true;
                         navFolder.controllersRecursive().forEach(c => c.updateDisplay());
                     }
                 }
+                _setMapOpen(false);
             });
         }
 
-        const closeMapBtn = document.getElementById('close-map-btn');
-        if (closeMapBtn) {
-            closeMapBtn.addEventListener('click', () => {
-                if (_mapEl) _mapEl.style.display = 'none';
-                if (typeof params !== 'undefined') params.showMap = false;
-            });
-        }
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === 'm' || e.key === 'M') _setMapOpen(!_mapOpen);
+            else if (e.key === 'Escape' && _mapOpen) _setMapOpen(false);
+        });
+        document.addEventListener('click', (e) => {
+            if (_mapOpen && _mapEl && !_mapEl.contains(e.target)) _setMapOpen(false);
+        });
     }
     initMapUI();
 
@@ -455,63 +489,34 @@ let isInitializingGui = true;
         ctx.closePath();
     }
 
-    // Biome Specific Cartographic Palette (Luminescent Fantasy Theme)
-    function _getBiomeMapStyle(biomeId, isMajor = true) {
-        switch(biomeId) {
-            case 'ghibli_land':
-                return {
-                    sand: isMajor ? '#34d399' : '#10b981',
-                    fill: isMajor ? '#14532d' : '#0f3f22',
-                    highland: '#0a2916',
-                    contour: 'rgba(52, 211, 153, 0.40)',
-                    labelColor: '#4ade80',
-                    icon: '🌳',
-                    shortName: 'Ghibli Land'
-                };
-            case 'misty_mountains':
-            case 'misty_mountains_2':
-                return {
-                    sand: isMajor ? '#94a3b8' : '#64748b',
-                    fill: isMajor ? '#334155' : '#1e293b',
-                    highland: '#0f172a',
-                    contour: 'rgba(148, 163, 184, 0.40)',
-                    labelColor: '#cbd5e1',
-                    icon: '🏔️',
-                    shortName: biomeId === 'misty_mountains_2' ? 'Misty Mtn II' : 'Misty Mountains'
-                };
-            case 'crystal_land':
-                return {
-                    sand: isMajor ? '#38bdf8' : '#0284c7',
-                    fill: isMajor ? '#0c4a6e' : '#083344',
-                    highland: '#041f2d',
-                    contour: 'rgba(56, 189, 248, 0.60)',
-                    labelColor: '#38bdf8',
-                    icon: '💎',
-                    shortName: 'Crystal Land'
-                };
-            case 'magical_sanctuary':
-                return {
-                    sand: isMajor ? '#c084fc' : '#9333ea',
-                    fill: isMajor ? '#4c1d95' : '#3b0764',
-                    highland: '#24043d',
-                    contour: 'rgba(192, 132, 252, 0.50)',
-                    labelColor: '#e879f9',
-                    icon: '✨',
-                    shortName: 'Sanctuary'
-                };
-            case 'archipelago':
-            default:
-                return {
-                    sand: isMajor ? '#2dd4bf' : '#0d9488',
-                    fill: isMajor ? '#115e59' : '#0f4c47',
-                    highland: '#082f2c',
-                    contour: 'rgba(45, 212, 191, 0.40)',
-                    labelColor: '#2dd4bf',
-                    icon: '🌊',
-                    shortName: 'Archipelago'
-                };
+    // Square map window fitted around all islands (instead of the whole mostly-empty world)
+    let _mapViewCache = null, _mapViewIslands = null;
+    function _mapView() {
+        if (_mapViewIslands === worldLayout.islands && _mapViewCache) return _mapViewCache;
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (const isl of worldLayout.islands) {
+            const r = isl.maxRadius * 1.25;
+            minX = Math.min(minX, isl.centerX - r); maxX = Math.max(maxX, isl.centerX + r);
+            minZ = Math.min(minZ, isl.centerZ - r); maxZ = Math.max(maxZ, isl.centerZ + r);
         }
+        _mapViewIslands = worldLayout.islands;
+        _mapViewCache = { cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, half: Math.max(maxX - minX, maxZ - minZ) / 2 * 1.05 };
+        _bgMapCanvas = null; // new layout: repaint the islands
+        return _mapViewCache;
     }
+
+    const _mapName = (biome) => biome.name.replace(/^[^A-Za-z]+/, ''); // drop the emoji
+
+    // Soft painted palette per biome: [land, highland]
+    const _MAP_PAINT = {
+        ghibli_land: ['#9cc57a', '#7fae5f'],
+        ghibli_isles: ['#9cc57a', '#7fae5f'],
+        archipelago: ['#bcd48e', '#9dbd70'],
+        misty_mountains: ['#b3ae9f', '#97917f'],
+        misty_mountains_2: ['#b3ae9f', '#97917f'],
+        crystal_land: ['#a9cdd6', '#88b5c2'],
+        magical_sanctuary: ['#c9b1cf', '#ad91b6'],
+    };
 
     function _renderStaticMapBackground(W, H) {
         if (!_bgMapCanvas) {
@@ -521,245 +526,127 @@ let isInitializingGui = true;
         _bgMapCanvas.height = H;
         const bgCtx = _bgMapCanvas.getContext('2d');
         if (!bgCtx) return;
+        const k = W / 150; // line/label scale relative to the small map
 
-        // 1. Deep Ocean Nautical Canvas
-        const oceanGrad = bgCtx.createRadialGradient(W / 2, H / 2, 20, W / 2, H / 2, Math.max(W, H) * 0.70);
-        oceanGrad.addColorStop(0, '#0d182e');
-        oceanGrad.addColorStop(0.70, '#081020');
-        oceanGrad.addColorStop(1, '#040813');
-        bgCtx.fillStyle = oceanGrad;
+        // Sea
+        bgCtx.fillStyle = '#a9ccd3';
         bgCtx.fillRect(0, 0, W, H);
 
-        const worldExtent = worldLayout.worldBounds * 1.08;
-        const toMapX = (wx) => (wx / (worldExtent * 2.0) + 0.5) * W;
-        const toMapY = (wz) => (wz / (worldExtent * 2.0) + 0.5) * H;
-        const toMapR = (wr) => (wr / (worldExtent * 2.0)) * W;
+        const view = _mapView();
+        const toMapX = (wx) => ((wx - view.cx) / (view.half * 2.0) + 0.5) * W;
+        const toMapY = (wz) => ((wz - view.cz) / (view.half * 2.0) + 0.5) * H;
 
-        // 2. Subtle Glowing Coordinate Grid
-        bgCtx.strokeStyle = 'rgba(56, 189, 248, 0.07)';
-        bgCtx.lineWidth = 1;
-        for (let x = W / 4; x < W; x += W / 4) {
-            bgCtx.beginPath();
-            bgCtx.moveTo(x, 0);
-            bgCtx.lineTo(x, H);
-            bgCtx.stroke();
-        }
-        for (let y = H / 4; y < H; y += H / 4) {
-            bgCtx.beginPath();
-            bgCtx.moveTo(0, y);
-            bgCtx.lineTo(W, y);
-            bgCtx.stroke();
-        }
-
-        // World Bounds Ring (Soft glowing instrument ring)
-        const centerMapX = W / 2;
-        const centerMapY = H / 2;
-        bgCtx.strokeStyle = 'rgba(56, 189, 248, 0.25)';
-        bgCtx.lineWidth = 1.0;
-        bgCtx.beginPath();
-        bgCtx.arc(centerMapX, centerMapY, toMapR(worldLayout.worldBounds), 0, Math.PI * 2);
-        bgCtx.stroke();
-
-        // 3. Cyber/Nautical Compass Rose (Top-Right)
-        const roseX = W - 18;
-        const roseY = 18;
-        bgCtx.strokeStyle = 'rgba(56, 189, 248, 0.40)';
-        bgCtx.lineWidth = 0.8;
-        bgCtx.beginPath();
-        bgCtx.moveTo(roseX, roseY - 9);
-        bgCtx.lineTo(roseX, roseY + 9);
-        bgCtx.moveTo(roseX - 9, roseY);
-        bgCtx.lineTo(roseX + 9, roseY);
-        bgCtx.stroke();
-
-        bgCtx.fillStyle = '#38bdf8';
-        bgCtx.beginPath();
-        bgCtx.moveTo(roseX, roseY - 10);
-        bgCtx.lineTo(roseX - 2.5, roseY - 2);
-        bgCtx.lineTo(roseX + 2.5, roseY - 2);
-        bgCtx.closePath();
-        bgCtx.fill();
-
-        bgCtx.font = 'bold 7.5px ui-monospace, monospace';
-        bgCtx.fillStyle = '#38bdf8';
-        bgCtx.textAlign = 'center';
-        bgCtx.fillText('N', roseX, roseY - 12);
-
-        // 4. Render All Islands
+        // Islands: small ones first so the big ones sit on top
         const sortedIslands = [...worldLayout.islands].sort((a, b) => (a.isMajor ? 1 : 0) - (b.isMajor ? 1 : 0));
-
         sortedIslands.forEach(isl => {
-            const style = _getBiomeMapStyle(isl.biomeId, isl.isMajor);
-
-            // Clean shoreline perimeter with subtle glow
+            const [land, high] = _MAP_PAINT[isl.biomeId] || ['#b8cc92', '#9ab575'];
             const shorePts = _getIslandContourPoints(isl, toMapX, toMapY, 1.0, 36);
             _drawPolygonPath(bgCtx, shorePts);
-            bgCtx.fillStyle = style.fill;
+            bgCtx.fillStyle = land;
             bgCtx.fill();
-            bgCtx.strokeStyle = style.sand;
-            bgCtx.lineWidth = isl.isMajor ? 1.2 : 0.7;
+            bgCtx.strokeStyle = '#e6dcb8'; // pale sandy shoreline
+            bgCtx.lineWidth = Math.max(0.8, 1.1 * k);
             bgCtx.stroke();
 
-            // Interior Highland Contour (Only on Major Landmasses)
-            if (isl.isMajor || isl.radiusX > 1800) {
-                const ridgePts = _getIslandContourPoints(isl, toMapX, toMapY, 0.52, 28);
+            if (isl.isMajor) {
+                const ridgePts = _getIslandContourPoints(isl, toMapX, toMapY, 0.5, 28);
                 _drawPolygonPath(bgCtx, ridgePts);
-                bgCtx.fillStyle = style.highland;
+                bgCtx.fillStyle = high;
                 bgCtx.fill();
-                bgCtx.strokeStyle = style.contour;
-                bgCtx.lineWidth = 0.7;
-                bgCtx.stroke();
             }
         });
 
-        // 5. Regional Landmarks and Labels (Dark glass badges)
+        // Names only on the big map
+        if (W < 300) return;
         bgCtx.textAlign = 'center';
         bgCtx.textBaseline = 'middle';
-
+        bgCtx.font = `italic 600 ${Math.round(13 * k / 2.4)}px Georgia, 'Times New Roman', serif`;
+        bgCtx.lineJoin = 'round';
         worldLayout.islands.filter(isl => isl.isMajor).forEach(isl => {
+            const name = _mapName(isl.biome);
             const mx = toMapX(isl.centerX);
             const my = toMapY(isl.centerZ);
-            const style = _getBiomeMapStyle(isl.biomeId, true);
-            const name = style.shortName;
-
-            const labelY = my - (isl.radiusZ ? toMapR(isl.radiusZ) * 0.40 : 12);
-
-            const txt = `${style.icon} ${name}`;
-            bgCtx.font = 'bold 8.5px ui-sans-serif, system-ui, -apple-system, sans-serif';
-            const metrics = bgCtx.measureText(txt);
-            const padW = metrics.width + 10;
-            const padH = 14;
-
-            bgCtx.fillStyle = 'rgba(11, 19, 36, 0.88)';
-            bgCtx.strokeStyle = style.sand;
-            bgCtx.lineWidth = 0.8;
-            bgCtx.beginPath();
-            bgCtx.roundRect(mx - padW / 2, labelY - padH / 2, padW, padH, 3);
-            bgCtx.fill();
-            bgCtx.stroke();
-
-            bgCtx.fillStyle = style.labelColor;
-            bgCtx.fillText(txt, mx, labelY);
+            bgCtx.strokeStyle = 'rgba(245, 238, 218, 0.85)';
+            bgCtx.lineWidth = 3 * k / 2.4;
+            bgCtx.strokeText(name, mx, my);
+            bgCtx.fillStyle = '#4a3b24';
+            bgCtx.fillText(name, mx, my);
         });
-
-        // Special Landmark: 🦫 Capybara Haven Badge
-        const capyHavenX = toMapX(-1200);
-        const capyHavenY = toMapY(-800);
-        const capyTxt = '🦫 Capybaras';
-        bgCtx.font = 'bold 8px ui-sans-serif, system-ui, sans-serif';
-        const capyMetrics = bgCtx.measureText(capyTxt);
-        const capyPadW = capyMetrics.width + 8;
-        const capyPadH = 13;
-
-        bgCtx.fillStyle = 'rgba(11, 19, 36, 0.90)';
-        bgCtx.strokeStyle = 'rgba(245, 158, 11, 0.70)';
-        bgCtx.lineWidth = 0.8;
-        bgCtx.beginPath();
-        bgCtx.roundRect(capyHavenX - capyPadW / 2, capyHavenY - capyPadH / 2, capyPadW, capyPadH, 3);
-        bgCtx.fill();
-        bgCtx.stroke();
-
-        bgCtx.fillStyle = '#fbbf24';
-        bgCtx.fillText(capyTxt, capyHavenX, capyHavenY);
     }
 
     function _drawWorldMap(force) {
         const now = performance.now();
-        // Throttle map canvas & DOM text updates to 15 FPS (every ~66ms)
-        if (!force && now - _lastMapDrawTime < 66) return;
+        if (!force && now - _lastMapDrawTime < 66) return; // ~15 updates per second is plenty
         _lastMapDrawTime = now;
 
         if (!_mapCanvas) _mapCanvas = document.getElementById('map-canvas');
         if (_mapCanvas && !_mapCtx) _mapCtx = _mapCanvas.getContext('2d');
         if (!_mapCanvas || !_mapCtx) return;
-        const W = _mapCanvas.width, H = _mapCanvas.height;
 
+        // Match the canvas backing size to its on-screen size (sharp on HiDPI, re-renders when opened)
+        const rect = _mapCanvas.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const wantW = Math.max(1, Math.round(rect.width * dpr));
+        const wantH = Math.max(1, Math.round(rect.height * dpr));
+        if (_mapCanvas.width !== wantW || _mapCanvas.height !== wantH) {
+            _mapCanvas.width = wantW;
+            _mapCanvas.height = wantH;
+        }
+        const W = _mapCanvas.width, H = _mapCanvas.height;
+        const k = W / 150;
+
+        _mapView(); // refreshes (and drops the painted background) if the island layout changed
         if (!_bgMapCanvas || _bgMapCanvas.width !== W || _bgMapCanvas.height !== H) {
             _renderStaticMapBackground(W, H);
         }
 
         _mapCtx.clearRect(0, 0, W, H);
-        if (_bgMapCanvas) {
-            _mapCtx.drawImage(_bgMapCanvas, 0, 0);
-        }
+        if (_bgMapCanvas) _mapCtx.drawImage(_bgMapCanvas, 0, 0);
 
-        // Draw Hover Target Reticle if mouse is over canvas
         if (_hoverMapPos) {
-            _mapCtx.strokeStyle = 'rgba(203, 213, 225, 0.35)';
-            _mapCtx.lineWidth = 0.8;
-            _mapCtx.setLineDash([2, 2]);
+            _mapCtx.strokeStyle = 'rgba(74, 59, 36, 0.6)';
+            _mapCtx.lineWidth = 1.2 * dpr;
             _mapCtx.beginPath();
-            _mapCtx.arc(_hoverMapPos.x, _hoverMapPos.y, 8, 0, Math.PI * 2);
+            _mapCtx.arc(_hoverMapPos.x * dpr, _hoverMapPos.y * dpr, 7 * dpr, 0, Math.PI * 2);
             _mapCtx.stroke();
-            _mapCtx.setLineDash([]);
         }
 
-        // Draw High-Contrast Player Marker & Heading Vector
         if (typeof playerGrp !== 'undefined') {
-            const worldExtent = worldLayout.worldBounds * 1.08;
-            const px = (playerGrp.position.x / (worldExtent * 2.0) + 0.5) * W;
-            const pz = (playerGrp.position.z / (worldExtent * 2.0) + 0.5) * H;
-
-            const timeSec = now * 0.001;
-            const pingRadius = 4 + (timeSec % 1.6) * 10;
-            const pingAlpha = Math.max(0, 0.25 * (1.0 - (timeSec % 1.6) / 1.6));
-
-            // Low-contrast instrument pulse
-            _mapCtx.strokeStyle = `rgba(217, 119, 6, ${pingAlpha})`;
-            _mapCtx.lineWidth = 0.8;
-            _mapCtx.beginPath();
-            _mapCtx.arc(px, pz, pingRadius, 0, Math.PI * 2);
-            _mapCtx.stroke();
-
-            // Aircraft Forward Heading Vector
+            const view = _mapView();
+            const px = ((playerGrp.position.x - view.cx) / (view.half * 2.0) + 0.5) * W;
+            const pz = ((playerGrp.position.z - view.cz) / (view.half * 2.0) + 0.5) * H;
             const yaw = typeof currentYaw !== 'undefined' ? currentYaw : 0;
-            const headLen = 14;
-            const hx = px - Math.sin(yaw) * headLen;
-            const hz = pz - Math.cos(yaw) * headLen;
+            const size = Math.max(4 * dpr, 3.2 * k);
 
-            _mapCtx.strokeStyle = 'rgba(217, 119, 6, 0.65)';
-            _mapCtx.lineWidth = 1.2;
-            _mapCtx.beginPath();
-            _mapCtx.moveTo(px, pz);
-            _mapCtx.lineTo(hx, hz);
-            _mapCtx.stroke();
-
-            // Aircraft Delta Marker (Clear focal element ranking above all map graphics)
+            // Simple red arrow for Kiki
             _mapCtx.save();
             _mapCtx.translate(px, pz);
             _mapCtx.rotate(-yaw);
-
-            _mapCtx.fillStyle = '#d97706';
-            _mapCtx.strokeStyle = '#050a14';
-            _mapCtx.lineWidth = 1.0;
-
+            _mapCtx.fillStyle = '#c0392b';
+            _mapCtx.strokeStyle = '#fbf6e8';
+            _mapCtx.lineWidth = 1.2 * dpr;
             _mapCtx.beginPath();
-            _mapCtx.moveTo(0, -6);
-            _mapCtx.lineTo(4, 4.5);
-            _mapCtx.lineTo(0, 2.5);
-            _mapCtx.lineTo(-4, 4.5);
+            _mapCtx.moveTo(0, -size * 1.4);
+            _mapCtx.lineTo(size, size);
+            _mapCtx.lineTo(0, size * 0.45);
+            _mapCtx.lineTo(-size, size);
             _mapCtx.closePath();
-            _mapCtx.fill();
             _mapCtx.stroke();
+            _mapCtx.fill();
             _mapCtx.restore();
 
-            // Update Map Info Status Strip
-            const coordsEl = document.getElementById('map-coords-text');
             const badgeEl = document.getElementById('map-biome-badge');
-            if (coordsEl && badgeEl) {
+            if (badgeEl) {
                 const curB = getBiomeAt(playerGrp.position.x, playerGrp.position.z);
-                const pxVal = Math.round(playerGrp.position.x);
-                const pzVal = Math.round(playerGrp.position.z);
-                const altVal = Math.round(playerGrp.position.y);
-                coordsEl.innerText = `X: ${pxVal}m | Z: ${pzVal}m | ALT: ${altVal}m`;
-                badgeEl.innerText = curB ? curB.name : '🌊 Open Ocean';
+                const text = curB && !curB.isOcean ? _mapName(curB) : 'Open sea';
+                if (badgeEl.textContent !== text) badgeEl.textContent = text;
             }
         }
     }
 
 
         const gui = new GUI({ title: 'Settings' });
-    
+
     const params = {
         trails: isWindTrailsOn,
         shadows: isShadowsOn,
@@ -782,12 +669,18 @@ let isInitializingGui = true;
         fogPlane: true,
         godRays: !LOW_GFX,
         godRayIntensity: 0.65,
-        treeScale: 1.5,
+        treeScale: 3.75,
         quality: LOW_GFX ? 'Low' : 'Regular',
         showTerrain: true,
         showWater: true,
         showTrees: true,
         showClouds: true,
+        cloudsLow: true,
+        cloudsHigh: true,
+        cloudsGiant: true,
+        cloudsLowCount: LOW_GFX ? 40 : 150,
+        cloudsHighCount: LOW_GFX ? 0 : 24,
+        cloudsGiantCount: LOW_GFX ? 0 : 24,
         showBirds: true,
         showFogPlanes: true,
         showCrystals: true,
@@ -810,7 +703,7 @@ let isInitializingGui = true;
     });
     perfFolder.add(params, 'terrainRes', ['256', '128', '64']).name('Terrain Res').onChange(v => {
         terrainRes = parseInt(v);
-        const newGeo = new THREE.PlaneGeometry(4000, 4000, terrainRes, terrainRes);
+        const newGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, terrainRes, terrainRes);
         newGeo.rotateX(-Math.PI / 2);
         terrain.geometry.dispose();
         terrain.geometry = newGeo;
@@ -823,7 +716,7 @@ let isInitializingGui = true;
     });
     perfFolder.add(params, 'treeShadows').name('Tree Shadows').onChange(v => {
         isTreeShadowsOn = v;
-        if (typeof treeMeshes !== 'undefined') treeMeshes.forEach(mesh => mesh.castShadow = isTreeShadowsOn);
+        if (typeof treeMeshes !== 'undefined') [...treeMeshes, ...treeNearMeshes].forEach(mesh => mesh.castShadow = isTreeShadowsOn);
     });
     perfFolder.add(params, 'shadowDist', ['Close', 'Med', 'Far']).name('Shadow Dist').onChange(v => {
         shadowDistMode = v;
@@ -848,7 +741,7 @@ let isInitializingGui = true;
         nextTrack: () => document.getElementById('track-toggle').click(),
         fullscreen: () => document.getElementById('fullscreen-toggle').click()
     };
-    
+
     // Add Navigation folder (Go To Biome)
     const navFolder = gui.addFolder('Navigation');
     const biomeNamesList = BIOME_CATALOG.map(b => b.name);
@@ -924,14 +817,31 @@ let isInitializingGui = true;
     envFolder.add(params, 'wind').name('Wind').onChange(v => { if(isWindOn !== v) document.getElementById('wind-toggle').click(); });
     envFolder.add(params, 'rain').name('Rain').onChange(v => { isRainOn = v; if(typeof rainSystem !== 'undefined') rainSystem.visible = v; });
     envFolder.add(params, 'fogPlane').name('Ground Fog').onChange(v => { if(typeof window.fogGroup !== 'undefined') window.fogGroup.visible = v; });
-    envFolder.add(params, 'godRays').name('God Rays').onChange(v => { godRaysPass.enabled = v; });
-    envFolder.add(params, 'godRayIntensity', 0, 2, 0.05).name('Ray Intensity').onChange(v => { godRaysPass.uniforms.uIntensity.value = v; });
+    // God Rays editor (defaults match the GodRaysShader uniforms)
+    const godRayFolder = envFolder.addFolder('God Rays');
+    const godRayParams = { decay: 0.93, density: 0.5, weight: 0.75 };
+    godRayFolder.add(params, 'godRays').name('Enabled').onChange(v => { godRaysPass.enabled = v; });
+    godRayFolder.add(params, 'godRayIntensity', 0, 2, 0.05).name('Intensity').onChange(v => { godRaysPass.uniforms.uIntensity.value = v; });
+    godRayFolder.add(godRayParams, 'decay', 0.8, 1.0, 0.005).name('Decay (ray length)').onChange(v => { godRaysPass.uniforms.uDecay.value = v; });
+    godRayFolder.add(godRayParams, 'density', 0.1, 1.5, 0.05).name('Density (spread)').onChange(v => { godRaysPass.uniforms.uDensity.value = v; });
+    godRayFolder.add(godRayParams, 'weight', 0.1, 1.5, 0.05).name('Weight (brightness)').onChange(v => { godRaysPass.uniforms.uWeight.value = v; });
     envFolder.add(params, 'trails').name('Wind Trails').onChange(v => isWindTrailsOn = v);
+
+    // Turn individual cloud layers on/off
+    const cloudLayerFolder = envFolder.addFolder('Clouds');
+    cloudLayerFolder.add(params, 'cloudsLow').name('Low Puffy Clouds').onChange(v => { instClouds.visible = v; });
+    cloudLayerFolder.add(params, 'cloudsHigh').name('High Clouds').onChange(v => { instHighClouds.visible = v; });
+    cloudLayerFolder.add(params, 'cloudsGiant').name('Giant Clouds').onChange(v => { instMegaClouds.visible = v; });
+    // How many of each layer to draw (can't go above what the layer was built with)
+    const setCloudCount = (mesh, v) => { mesh.count = Math.min(Math.round(v), mesh.instanceMatrix.count); };
+    cloudLayerFolder.add(params, 'cloudsLowCount', 0, params.cloudsLowCount, 1).name('Low Clouds: How Many').onChange(v => setCloudCount(instClouds, v));
+    cloudLayerFolder.add(params, 'cloudsHighCount', 0, 24, 1).name('High Clouds: How Many').onChange(v => setCloudCount(instHighClouds, v));
+    cloudLayerFolder.add(params, 'cloudsGiantCount', 0, 24, 1).name('Giant Clouds: How Many').onChange(v => setCloudCount(instMegaClouds, v));
 
     const debugFolder = gui.addFolder('🔧 Debug Render');
     debugFolder.add(params, 'showTerrain').name('Terrain').onChange(v => { terrain.visible = v; });
     debugFolder.add(params, 'showWater').name('Water').onChange(v => { waterMesh.visible = v; });
-    debugFolder.add(params, 'showTrees').name('Trees').onChange(v => { treeMeshes.forEach(m => m.visible = v); });
+    debugFolder.add(params, 'showTrees').name('Trees').onChange(v => { [...treeMeshes, ...treeNearMeshes].forEach(m => m.visible = v); });
     debugFolder.add(params, 'showClouds').name('Clouds').onChange(v => { instClouds.visible = v; if(typeof instHighClouds !== 'undefined') instHighClouds.visible = v; if(typeof instMegaClouds !== 'undefined') instMegaClouds.visible = v; });
     debugFolder.add(params, 'showBirds').name('Birds').onChange(v => { if(typeof instBirds !== 'undefined') instBirds.visible = v; if(typeof flockGrp !== 'undefined') flockGrp.visible = v; });
     debugFolder.add(params, 'showFogPlanes').name('Fog Planes').onChange(v => { if(typeof window.fogGroup !== 'undefined') window.fogGroup.visible = v; });
@@ -972,9 +882,9 @@ let isInitializingGui = true;
         document.exitFullscreen();
       }
     });
-    
 
-    
+
+
     document.getElementById('pause-toggle').addEventListener('click', () => {
         isFlightPaused = !isFlightPaused;
         document.getElementById('pause-toggle').innerText = isFlightPaused ? '▶' : '⏸';
@@ -994,7 +904,7 @@ let isInitializingGui = true;
             trailsToggleBtn.innerText = `Wind Trails: ${isWindTrailsOn ? 'ON' : 'OFF'}`;
         });
     }
-    
+
 
 
     window.addEventListener('wheel', (e) => {
@@ -1003,7 +913,7 @@ let isInitializingGui = true;
         cameraZoomDist = Math.max(0.5, Math.min(100.0, cameraZoomDist)); // clamp between 0.5 and 100 units
 
     }, { passive: true });
-    
+
     document.getElementById('photo-exit').addEventListener('click', () => {
         isPhotoMode = false;
         document.getElementById('settings-controls').style.display = 'flex';
@@ -1019,13 +929,13 @@ let isInitializingGui = true;
             photoControls.enabled = false;
         }
     });
-    
+
     document.getElementById('photo-capture').addEventListener('click', () => {
         document.getElementById('photo-mode-ui').style.display = 'none';
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-        
-        
+
+
         composer.render();
                 const dataURL = renderer.domElement.toDataURL('image/png');
                 const link = document.createElement('a');
@@ -1040,7 +950,7 @@ let isInitializingGui = true;
     // ==========================================
     // 1. CORE SETUP & TOON RENDERER
     // ==========================================
-    
+
 
 
     const container = document.getElementById('app');
@@ -1055,11 +965,12 @@ let isInitializingGui = true;
     const renderer = new THREE.WebGLRenderer({ antialias: !LOW_GFX, preserveDrawingBuffer: true, logarithmicDepthBuffer: false });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(LOW_GFX ? 0.5 : Math.min(window.devicePixelRatio, 1.25));
-    
+
     renderer.shadowMap.enabled = !LOW_GFX;
     renderer.shadowMap.type = LOW_GFX ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.8;
+    renderer.info.autoReset = false;
     container.appendChild(renderer.domElement);
 
     const composer = new EffectComposer(renderer);
@@ -1197,7 +1108,7 @@ let isInitializingGui = true;
         `
     };
 
-    
+
     // ==========================================
     // GOD RAYS POST-PROCESSING PASS
     // ==========================================
@@ -1234,7 +1145,7 @@ let isInitializingGui = true;
 
             void main() {
                 vec4 texel = texture2D(tDiffuse, vUv);
-                
+
                 // Direction from this pixel toward the sun
                 vec2 deltaUV = (vUv - uSunScreenPos);
                 float dist = length(deltaUV);
@@ -1243,10 +1154,10 @@ let isInitializingGui = true;
                 // Screen-space dither offsets sample points to eliminate banding
                 float dither = pseudoRand(gl_FragCoord.xy);
                 vec2 sampleUV = vUv - (deltaUV * dither);
-                
+
                 float illumination = 0.0;
                 float currentWeight = uWeight;
-                
+
                 for(int i = 0; i < 16; i++) {
                     sampleUV -= deltaUV;
                     vec4 samp = texture2D(tDiffuse, sampleUV);
@@ -1255,16 +1166,16 @@ let isInitializingGui = true;
                     illumination += bright * currentWeight;
                     currentWeight *= uDecay;
                 }
-                
+
                 // Intensity normalization for 16-sample step integration
                 illumination *= 1.85;
 
                 // Fade out rays near screen edges and when sun is off-screen
                 float edgeFade = 1.0 - smoothstep(0.4, 1.5, dist);
-                
+
                 // Warm golden tint for the rays
                 vec3 rayColor = vec3(1.0, 0.9, 0.7) * illumination * uIntensity * edgeFade * uSunVisible;
-                
+
                 gl_FragColor = vec4(texel.rgb + rayColor, texel.a);
             }
         `
@@ -1445,7 +1356,7 @@ let isInitializingGui = true;
     instCrystals.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     instCrystals.frustumCulled = false; // Prevent crystals from vanishing when looking away from origin
     scene.add(instCrystals);
-    
+
     // Position crystals across Crystal Land and Magical Sanctuary
     const crystalData = [];
     const crystalIslands = worldLayout.islands.filter(isl => isl.biomeId === 'crystal_land' || isl.biomeId === 'magical_sanctuary');
@@ -1461,7 +1372,7 @@ let isInitializingGui = true;
         const cx = isl.centerX + Math.cos(angle) * rX;
         const cz = isl.centerZ + Math.sin(angle) * rZ;
         const groundH = Math.max(2.0, getWorldHeight(cx, cz));
-        
+
         const isFloating = (i % 3 !== 0); // 2/3 floating soaring monoliths, 1/3 ground spires
         const s = isFloating ? (32 + (i % 6) * 12) : (24 + (i % 4) * 8);
         const baseY = isFloating ? (groundH + 45 + (i % 7) * 26) : (groundH + s * 1.3);
@@ -1621,7 +1532,7 @@ let isInitializingGui = true;
             const tz = cz + Math.sin(angle) * r;
             const groundY = getWorldHeight(tx, tz);
             if (groundY < 3.2 || groundY > 38.0) continue;
-            
+
             const b = getBiomeAt(tx, tz);
             // Capybaras thrive in Archipelago, Ghibli Land, and lush coastal plains
             if (b && (b.id === 'crystal_land' || b.id === 'magical_sanctuary' || b.id === 'misty_mountains' || b.id === 'misty_mountains_2')) {
@@ -1791,7 +1702,7 @@ let isInitializingGui = true;
     const flareTextureLoader = new THREE.TextureLoader();
     const textureFlare0 = flareTextureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/lensflare/lensflare0.png');
     const textureFlare3 = flareTextureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/lensflare/lensflare3.png');
-    
+
     const staticSun = new THREE.Group();
     staticSun.position.set(0, 1500, -20000); // Massive distance so Kiki can fly towards it
     scene.add(staticSun);
@@ -1832,13 +1743,13 @@ let isInitializingGui = true;
     const matBush = new THREE.MeshToonMaterial({ color: 0x48a868, gradientMap, dithering: true });
     const matCloud = new THREE.MeshToonMaterial({ color: 0xfffaec, transparent: true, opacity: 0.65, gradientMap, dithering: true });
     const matWispyCloud = new THREE.MeshToonMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, gradientMap, dithering: true });
-    const matFlower = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, dithering: true }); 
-    const terrainMat = new THREE.MeshToonMaterial({ 
-        vertexColors: true, 
+    const matFlower = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, dithering: true });
+    const terrainMat = new THREE.MeshToonMaterial({
+        vertexColors: true,
         gradientMap,
         dithering: true
     });
-    
+
     // Shader injection for perfect pixel-smooth shorelines
     terrainMat.onBeforeCompile = (shader) => {
         shader.vertexShader = `
@@ -1851,32 +1762,46 @@ let isInitializingGui = true;
         );
     };
 
+    // Trees closer than this use the full model; farther ones use a leaves-only light model
+    const TREE_LOD_RADIUS = 150.0;
+    // Trees exist only inside this radius; ground fog is fully opaque by then (see dynamicFar)
+    const TREE_VIEW_DIST = 520.0;
     const treeUniforms = {
         uPlayerPos: { value: new THREE.Vector3(0, 0, 0) },
-        uTreeScale: { value: 1.5 }
+        uTreeScale: { value: 3.75 },
+        uLodRadius: { value: TREE_LOD_RADIUS }
     };
-    
-    const matTree = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap, dithering: true });
-    matTree.onBeforeCompile = (shader) => {
-        matTree.userData.shader = shader;
-        shader.uniforms.uPlayerPos = treeUniforms.uPlayerPos;
-        shader.uniforms.uTreeScale = treeUniforms.uTreeScale;
-        
-        shader.vertexShader = `
-            uniform vec3 uPlayerPos;
-            uniform float uTreeScale;
-            ${shader.vertexShader}
-        `.replace(
-            `#include <begin_vertex>`,
-            `
-            #include <begin_vertex>
-            vec4 worldPos = instanceMatrix * vec4( position, 1.0 );
-            float dist = distance(worldPos.xz, uPlayerPos.xz);
-            float distScale = clamp((850.0 - dist) / 100.0, 0.0, 1.0);
-            transformed *= (uTreeScale / 1.5) * distScale;
-            `
-        );
-    };
+
+    // lod: 'near' draws only trees inside TREE_LOD_RADIUS, 'far' only trees outside it
+    function makeTreeMaterial(lod) {
+        const mat = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap, dithering: true, side: THREE.DoubleSide });
+        mat.onBeforeCompile = (shader) => {
+            mat.userData.shader = shader;
+            shader.uniforms.uPlayerPos = treeUniforms.uPlayerPos;
+            shader.uniforms.uTreeScale = treeUniforms.uTreeScale;
+            shader.uniforms.uLodRadius = treeUniforms.uLodRadius;
+
+            shader.vertexShader = `
+                uniform vec3 uPlayerPos;
+                uniform float uTreeScale;
+                uniform float uLodRadius;
+                ${shader.vertexShader}
+            `.replace(
+                `#include <begin_vertex>`,
+                `
+                #include <begin_vertex>
+                float dist = distance(instanceMatrix[3].xz, uPlayerPos.xz); // tree base, so a tree swaps as a whole
+                float distScale = clamp((${TREE_VIEW_DIST.toFixed(1)} - dist) / 80.0, 0.0, 1.0);
+                distScale *= ${lod === 'near' ? '1.0 - step(uLodRadius, dist)' : 'step(uLodRadius, dist)'};
+                transformed *= (uTreeScale / 1.5) * distScale;
+                `
+            );
+        };
+        mat.customProgramCacheKey = () => 'tree-' + lod;
+        return mat;
+    }
+    const matTree = makeTreeMaterial('far');
+    const matTreeNear = makeTreeMaterial('near');
 
 
 
@@ -1887,7 +1812,7 @@ let isInitializingGui = true;
     // ==========================================
     // 5. TERRAIN MESH WITH VERTEX COLORS
     // ==========================================
-    let terrainGeo = new THREE.PlaneGeometry(4000, 4000, terrainRes, terrainRes); 
+    let terrainGeo = new THREE.PlaneGeometry(TERRAIN_SIZE, TERRAIN_SIZE, terrainRes, terrainRes);
     terrainGeo.rotateX(-Math.PI / 2);
     const terrain = new THREE.Mesh(terrainGeo, terrainMat);
     terrain.receiveShadow = true;
@@ -1906,7 +1831,7 @@ let isInitializingGui = true;
     const colorOliveGrass = new THREE.Color(0x8cc440);
     const colorHigh = new THREE.Color(0x89e05e); // Grass High
     const colorIslandRock = new THREE.Color(0x8a725a);
-    const colorDirt = new THREE.Color(0xdcb58a); 
+    const colorDirt = new THREE.Color(0xdcb58a);
     const colorPath = new THREE.Color(0xbd9973); // dirt path color
     const tempColor = new THREE.Color();
     const patchColor = new THREE.Color();
@@ -1934,16 +1859,38 @@ let isInitializingGui = true;
     }
 
     let terrainHeightBuffer = new Float32Array((256 + 1) * (256 + 1));
+    let terrainPrevHeights = new Float32Array(0);
+    let terrainPrevColors = new Float32Array(0);
+    let lastTerrainRes = -1;
+
+    // Height of the *drawn* ground at (x, z). Terrain vertices always sit on a fixed world lattice,
+    // so interpolating the same two triangles PlaneGeometry uses gives the exact visible surface.
+    // Also returns the surface slope in _meshSlope.
+    let _meshSlope = 0;
+    function getMeshHeight(x, z) {
+        const sp = TERRAIN_SIZE / terrainRes;
+        const x0 = Math.floor(x / sp) * sp, z0 = Math.floor(z / sp) * sp;
+        const fx = (x - x0) / sp, fz = (z - z0) / sp;
+        const ha = getWorldHeight(x0, z0);           // (x0, z0)
+        const hb = getWorldHeight(x0, z0 + sp);      // (x0, z1)
+        const hc = getWorldHeight(x0 + sp, z0 + sp); // (x1, z1)
+        const hd = getWorldHeight(x0 + sp, z0);      // (x1, z0)
+        const sx = Math.max(Math.abs(hd - ha), Math.abs(hc - hb)) / sp;
+        const sz = Math.max(Math.abs(hb - ha), Math.abs(hc - hd)) / sp;
+        _meshSlope = Math.sqrt(sx * sx + sz * sz);
+        if (fx + fz <= 1.0) return ha + (hd - ha) * fx + (hb - ha) * fz;
+        return hc + (hb - hc) * (1.0 - fx) + (hd - hc) * (1.0 - fz);
+    }
 
     function updateTerrainGeometry(playerX, playerZ) {
-        const vertexSpacing = 4000 / terrainRes;
+        const vertexSpacing = TERRAIN_SIZE / terrainRes;
         const gridX = Math.floor(playerX / vertexSpacing) * vertexSpacing;
         const gridZ = Math.floor(playerZ / vertexSpacing) * vertexSpacing;
-        
+
         if (gridX === lastTerrainGridX && gridZ === lastTerrainGridZ) return;
-        
+
         terrain.position.set(gridX, 0, gridZ);
-        
+
         const pos = terrainGeo.attributes.position;
         if (!terrainGeo.attributes.color) {
             terrainGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
@@ -1957,7 +1904,31 @@ let isInitializingGui = true;
             terrainHeightBuffer = new Float32Array(count);
         }
 
+        // Grid moved by (dc, dr) cells: vertex (r, c) now shows what (r + dr, c + dc) showed before
+        const dc = Math.round((gridX - lastTerrainGridX) / vertexSpacing);
+        const dr = Math.round((gridZ - lastTerrainGridZ) / vertexSpacing);
+        const canShift = lastTerrainGridX !== -9999 && lastTerrainRes === terrainRes &&
+                         Math.abs(dc) < stride && Math.abs(dr) < stride;
+        if (canShift) {
+            if (terrainPrevHeights.length !== count) terrainPrevHeights = new Float32Array(count);
+            if (terrainPrevColors.length !== count * 3) terrainPrevColors = new Float32Array(count * 3);
+            terrainPrevHeights.set(terrainHeightBuffer.subarray(0, count));
+            terrainPrevColors.set(colors.array);
+        }
+
         for (let i = 0; i < count; i++) {
+            if (canShift) {
+                const oc = (i % stride) + dc;
+                const or = ((i / stride) | 0) + dr;
+                if (oc >= 0 && oc < stride && or >= 0 && or < stride) {
+                    const oi = or * stride + oc;
+                    const h = terrainPrevHeights[oi];
+                    pos.setY(i, h);
+                    terrainHeightBuffer[i] = h;
+                    colors.setXYZ(i, terrainPrevColors[oi * 3], terrainPrevColors[oi * 3 + 1], terrainPrevColors[oi * 3 + 2]);
+                    continue;
+                }
+            }
             const worldX = pos.getX(i) + gridX;
             const worldZ = pos.getZ(i) + gridZ;
             const h = getWorldHeight(worldX, worldZ);
@@ -1965,7 +1936,7 @@ let isInitializingGui = true;
             terrainHeightBuffer[i] = h;
 
             getWorldColor(h, worldX, worldZ, tempColor);
-            
+
             // Add dirt path
             const pathMask = getPathStrength(worldX, worldZ);
             if (pathMask > 0 && h > 2.0 && h < 25.0) {
@@ -1974,7 +1945,7 @@ let isInitializingGui = true;
 
             colors.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
         }
-        
+
         // Fast analytical regular-grid normal calculation (10x-20x faster than computeVertexNormals)
         const invTwoSpacing = 1.0 / (2.0 * vertexSpacing);
         for (let r = 0; r <= terrainRes; r++) {
@@ -1992,26 +1963,27 @@ let isInitializingGui = true;
                 normals.setXYZ(idx, nx * invLen, invLen, nz * invLen);
             }
         }
-        
+
         pos.needsUpdate = true;
         colors.needsUpdate = true;
         normals.needsUpdate = true;
-        
+
         lastTerrainGridX = gridX;
         lastTerrainGridZ = gridZ;
+        lastTerrainRes = terrainRes;
     }
 
     // ==========================================
     // 6. INSTANCED DIORAMA PROPS
     // ==========================================
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
+
     const ROCK_COUNT = 0;
     const BUSH_COUNT = 0;
         const CLOUD_COUNT = LOW_GFX ? 40 : 150;
     const FLOWER_COUNT = 0; // Optimized for FPS
-    const TREE_MULT = 0.25; // Slashed from 1.0 to massively reduce vertex load (from 17 million to 4 million)
-    
+    const PINE_SLOTS = LOW_GFX ? 180 : 560; // sized to the free grid cells inside TREE_VIEW_DIST // per pine mesh — sized to the free grid cells inside the streaming circle
+
     function applyColor(geometry, colorHex) {
         const color = new THREE.Color(colorHex);
         const colors = [];
@@ -2107,7 +2079,7 @@ let isInitializingGui = true;
     t5Trunk.translate(0, 1.75, 0);
     applyColor(t5Trunk, 0x7a6f5e);
     t5Geos.push(t5Trunk);
-    
+
     const leavesPos = [
         {x: 0, y: 5.5, z: 0, s: 1.3, col: 0x88c94e},
         {x: 2.1, y: 4.2, z: 0, s: 1.1, col: 0x6bb846},
@@ -2144,12 +2116,12 @@ let isInitializingGui = true;
     });
     const geoTree6 = BufferGeometryUtils.mergeGeometries(t6Geos.map(g => g.index ? g.toNonIndexed() : g), false);
 
-    
-    const wallColors = [0xfef0c8, 0xebaf9b, 0x82bfa8, 0x6e9ca8, 0xe1d9c1, 0xffffff, 0xcbe3d6]; 
+
+    const wallColors = [0xfef0c8, 0xebaf9b, 0x82bfa8, 0x6e9ca8, 0xe1d9c1, 0xffffff, 0xcbe3d6];
     const roofColors = [0xd95a53, 0x4a7c8c, 0x5a6351, 0x8a7b6b, 0x8a4538, 0x566d8f];
     const woodColor = 0x5c4033;
     const windowColor = 0x223344;
-     
+
     const matWalls = wallColors.map(c => new THREE.MeshToonMaterial({ color: c, gradientMap: gradientMap }));
     const matRoofs = roofColors.map(c => new THREE.MeshToonMaterial({ color: c, gradientMap: gradientMap }));
     const matWoodDark = new THREE.MeshToonMaterial({ color: woodColor, gradientMap: gradientMap });
@@ -2188,18 +2160,18 @@ let isInitializingGui = true;
         const base = new THREE.Mesh(baseGeo, matBase);
         base.castShadow = true;
         balc.add(base);
-                 
+
         const railGeo = new THREE.BoxGeometry(0.2, 1.2, d);
         const railL = new THREE.Mesh(railGeo, matRail);
         railL.position.set(-w/2 + 0.1, 0.6, 0);
         railL.castShadow = true;
         balc.add(railL);
-                 
+
         const railR = new THREE.Mesh(railGeo, matRail);
         railR.position.set(w/2 - 0.1, 0.6, 0);
         railR.castShadow = true;
         balc.add(railR);
-                 
+
         const railFGeo = new THREE.BoxGeometry(w, 1.2, 0.2);
         const railF = new THREE.Mesh(railFGeo, matRail);
         railF.position.set(0, 0.6, d/2 - 0.1);
@@ -2211,7 +2183,7 @@ let isInitializingGui = true;
     function createWindow(w, h) {
         const winGeo = new THREE.BoxGeometry(w, h, 0.2);
         const win = new THREE.Mesh(winGeo, matWindowDark);
-        
+
         const frameGeoL = new THREE.BoxGeometry(0.3, h + 0.6, 0.4);
         const frameL = new THREE.Mesh(frameGeoL, matWoodDark);
         frameL.position.set(-w/2 - 0.15, 0, 0);
@@ -2257,7 +2229,7 @@ let isInitializingGui = true;
 
     // Other Geometries
     const geoRock = new THREE.DodecahedronGeometry(2.5, 0); // 36-triangle low poly boulders
-    
+
     const geoBush = new THREE.IcosahedronGeometry(2, 0);
     const geoFlowerStem = new THREE.CylinderGeometry(0.05, 0.05, 0.4, 3);
     geoFlowerStem.translate(0, 0.2, 0);
@@ -2271,7 +2243,7 @@ let isInitializingGui = true;
     b3.rotateX(-0.2);
 
     const geoCloud = new THREE.IcosahedronGeometry(25, 2);
-    geoCloud.scale(2.0, 1.0, 1.5); 
+    geoCloud.scale(2.0, 1.0, 1.5);
     const cpos = geoCloud.attributes.position;
     for (let i = 0; i < cpos.count; i++) {
         let x = cpos.getX(i);
@@ -2288,21 +2260,16 @@ let isInitializingGui = true;
     geoCloud.computeVertexNormals();
 
     // Meshes
-    const instTree1 = new THREE.InstancedMesh(geoTree1, matTree, Math.floor(3600 * TREE_MULT));
-    const instTree2 = new THREE.InstancedMesh(geoTree2, matTree, Math.floor(3600 * TREE_MULT));
-    const instTree3 = new THREE.InstancedMesh(geoTree3, matTree, Math.floor(3600 * TREE_MULT));
-    const instTree4 = new THREE.InstancedMesh(geoTree4, matTree, Math.floor(2400 * TREE_MULT));
-    const instOak1 = new THREE.InstancedMesh(geoTree5, matTree, Math.floor(2400 * TREE_MULT));
-    const instOak2 = new THREE.InstancedMesh(geoTree6, matTree, Math.floor(2400 * TREE_MULT));
-    const instOak3 = new THREE.InstancedMesh(geoTree5, matTree, Math.floor(2400 * TREE_MULT));
+    // Pines only (oaks removed)
+    const instTree1 = new THREE.InstancedMesh(geoTree1, matTree, PINE_SLOTS);
+    const instTree2 = new THREE.InstancedMesh(geoTree2, matTree, PINE_SLOTS);
+    const instTree3 = new THREE.InstancedMesh(geoTree3, matTree, PINE_SLOTS);
+    const instTree4 = new THREE.InstancedMesh(geoTree4, matTree, PINE_SLOTS);
     scene.add(instTree1);
     scene.add(instTree2);
     scene.add(instTree3);
     scene.add(instTree4);
-    scene.add(instOak1);
-    scene.add(instOak2);
-    scene.add(instOak3);
-    
+
     let treeGreenVariations = [
         0xffffff, // Normal white
         0xddff88, // Warm bright yellow-green
@@ -2313,7 +2280,45 @@ let isInitializingGui = true;
         0x669966  // Deep forest green
     ];
     const tempTreeColor = new THREE.Color();
-    const treeMeshes = [instTree1, instTree2, instTree3, instTree4, instOak1, instOak2, instOak3];
+    const treeMeshes = [instTree1, instTree2, instTree3, instTree4];
+
+    // Each tree mesh gets a small "near" twin holding copies of the trees within TREE_LOD_RADIUS
+    const TREE_NEAR_CAP = 400;
+    const treeNearMeshes = treeMeshes.map(far => {
+        const near = new THREE.InstancedMesh(far.geometry, matTreeNear, TREE_NEAR_CAP);
+        near.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(TREE_NEAR_CAP * 3).fill(1), 3);
+        near.count = 0;
+        near.castShadow = false;
+        near.receiveShadow = true;
+        near.frustumCulled = false;
+        scene.add(near);
+        far.userData.near = near;
+        return near;
+    });
+
+    function updateTreeLOD(px, pz) {
+        const r = TREE_LOD_RADIUS + 40.0; // margin: the shader makes the exact cut, this just has to include them
+        const r2 = r * r;
+        treeMeshes.forEach((far, k) => {
+            const near = treeNearMeshes[k];
+            const fm = far.instanceMatrix.array;
+            const fc = far.instanceColor ? far.instanceColor.array : null;
+            const nm = near.instanceMatrix.array;
+            const nc = near.instanceColor.array;
+            let n = 0;
+            for (let i = 0; i < far.count && n < TREE_NEAR_CAP; i++) {
+                const dx = fm[i * 16 + 12] - px, dz = fm[i * 16 + 14] - pz;
+                if (dx * dx + dz * dz > r2) continue;
+                nm.set(fm.subarray(i * 16, i * 16 + 16), n * 16);
+                if (fc) nc.set(fc.subarray(i * 3, i * 3 + 3), n * 3);
+                else nc.fill(1, n * 3, n * 3 + 3);
+                n++;
+            }
+            near.count = n;
+            near.instanceMatrix.needsUpdate = true;
+            near.instanceColor.needsUpdate = true;
+        });
+    }
     treeMeshes.forEach(mesh => {
         mesh.maxCount = mesh.count;
         for (let i = 0; i < mesh.count; i++) {
@@ -2345,46 +2350,46 @@ let isInitializingGui = true;
         tempFlowerColor.setHex(flowerColors[Math.floor(Math.random() * flowerColors.length)]);
         instFlowers.setColorAt(i, tempFlowerColor);
     }
-    
+
     // Water Mesh
     let waterMesh;
-    
+
     function loadAssets() {
         // All 3D models removed
     }
 
     const waterGeo = new THREE.PlaneGeometry(5000, 5000);
     waterGeo.rotateX(-Math.PI / 2);
-    
+
     const waterUniforms = {
         uTime: { value: 0 }
     };
-    
-    const waterMat = new THREE.MeshStandardMaterial({ 
-        color: 0x4da9e8, 
-        transparent: false, 
+
+    const waterMat = new THREE.MeshStandardMaterial({
+        color: 0x4da9e8,
+        transparent: false,
         opacity: 1.0,
         roughness: 0.1,
         metalness: 0.2
     });
-    
+
     waterMat.onBeforeCompile = (shader) => {
         shader.uniforms.uTime = waterUniforms.uTime;
-        
+
         shader.vertexShader = `
             varying vec3 vWorldPos;
         ` + shader.vertexShader;
-        
+
         shader.vertexShader = shader.vertexShader.replace(
             `#include <worldpos_vertex>`,
             `#include <worldpos_vertex>
              vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`
         );
-        
+
         shader.fragmentShader = `
             uniform float uTime;
             varying vec3 vWorldPos;
-            
+
             vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
             float snoise(vec2 v){
                 const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
@@ -2402,7 +2407,7 @@ let isInitializingGui = true;
                 return 130.0 * dot(m, g);
             }
         ` + shader.fragmentShader;
-        
+
         shader.fragmentShader = shader.fragmentShader.replace(
             `#include <color_fragment>`,
             `#include <color_fragment>
@@ -2410,14 +2415,14 @@ let isInitializingGui = true;
              float n1 = 1.0 - abs(snoise(uv + vec2(uTime * 0.1, uTime * 0.05)));
              float n2 = 1.0 - abs(snoise(uv * 1.5 - vec2(uTime * 0.15, -uTime * 0.05)));
              float caustics = pow(n1, 6.0) + pow(n2, 6.0) * 0.5;
-             
+
              // Fade out ripples on inland rivers and small lakes perfectly
              float simpleTerrainH = snoise(vWorldPos.xz * 0.003) * 15.0;
-             float deepWater = smoothstep(-0.5, -4.0, simpleTerrainH); 
-             
+             float deepWater = smoothstep(-0.5, -4.0, simpleTerrainH);
+
              caustics = clamp(caustics, 0.0, 1.0) * deepWater;
              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.9, 0.95, 1.0), caustics * 0.5);
-             
+
              float dist = length(vWorldPos.xz - cameraPosition.xz);
              float depthFade = smoothstep(50.0, 350.0, dist);
              diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.2, depthFade);
@@ -2437,14 +2442,14 @@ let isInitializingGui = true;
     const fogGeo = new THREE.PlaneGeometry(3500, 3500);
     fogGeo.rotateX(-Math.PI / 2);
     const fogUniforms = { uTime: { value: 0 } };
-    
+
     const fogMat = new THREE.MeshLambertMaterial({
         color: 0xffffff,
         transparent: true,
         opacity: 0.5,
         depthWrite: false,
     });
-    
+
     fogMat.onBeforeCompile = (shader) => {
         shader.uniforms.uTime = fogUniforms.uTime;
         shader.vertexShader = `
@@ -2458,7 +2463,7 @@ let isInitializingGui = true;
         shader.fragmentShader = `
             uniform float uTime;
             varying vec3 vWorldPos;
-            
+
             vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
             float snoise(vec2 v){
                 const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
@@ -2476,7 +2481,7 @@ let isInitializingGui = true;
                 return 130.0 * dot(m, g);
             }
         ` + shader.fragmentShader;
-        
+
         shader.fragmentShader = shader.fragmentShader.replace(
             `#include <dithering_fragment>`,
             `#include <dithering_fragment>
@@ -2484,12 +2489,12 @@ let isInitializingGui = true;
              float yOffset = vWorldPos.y * 0.2;
              float n1 = snoise(uv + vec2(uTime * 0.03 + yOffset, uTime * 0.02));
              float n2 = snoise(uv * 2.0 - vec2(uTime * 0.02 - yOffset, -uTime * 0.03));
-             
+
              float noiseAlpha = smoothstep(-0.2, 0.8, n1 + n2 * 0.5);
-             
+
              float dist = length(vWorldPos.xz - cameraPosition.xz);
              float edgeFade = 1.0 - smoothstep(1200.0, 1700.0, dist);
-             
+
              gl_FragColor.a *= noiseAlpha * edgeFade;
             `
         );
@@ -2509,13 +2514,13 @@ let isInitializingGui = true;
     treeMeshes.forEach(mesh => {
         mesh.castShadow = false; // MASSIVE FPS GAIN: Stop rendering 9,000+ complex trees into the shadow depth map
         mesh.receiveShadow = true;
-        mesh.frustumCulled = false; 
+        mesh.frustumCulled = false;
         scene.add(mesh);
     });
     [instRocks, instBushes, instFlowers].forEach(mesh => {
         mesh.castShadow = false;
         mesh.receiveShadow = true;
-        mesh.frustumCulled = false; 
+        mesh.frustumCulled = false;
         scene.add(mesh);
     });
 
@@ -2529,15 +2534,15 @@ let isInitializingGui = true;
     const mainPillar = new THREE.DodecahedronGeometry(150, 1).toNonIndexed();
     mainPillar.scale(1, 1.2, 1);
     baseCloudSpheres.push(mainPillar);
-    
+
     const fluff1 = new THREE.DodecahedronGeometry(110, 1).toNonIndexed();
     fluff1.translate(120, -30, 40);
     baseCloudSpheres.push(fluff1);
-    
+
     const fluff2 = new THREE.DodecahedronGeometry(90, 1).toNonIndexed();
     fluff2.translate(-100, -50, 80);
     baseCloudSpheres.push(fluff2);
-    
+
     const fluff3 = new THREE.DodecahedronGeometry(130, 1).toNonIndexed();
     fluff3.translate(-40, 20, -110);
     baseCloudSpheres.push(fluff3);
@@ -2564,7 +2569,7 @@ let isInitializingGui = true;
     const instMegaClouds = new THREE.InstancedMesh(highCloudGeo, megaCloudMat, MEGA_CLOUD_COUNT);
     instMegaClouds.frustumCulled = false;
     scene.add(instMegaClouds);
-    
+
     // Initialize all cloud instance matrices so they don't render a giant mass at origin (0,0,0)
     const dummyInit = new THREE.Object3D();
     dummyInit.position.set(0, -1000, 0); // Force teleport on first frame!
@@ -2578,7 +2583,7 @@ let isInitializingGui = true;
     instHighClouds.instanceMatrix.needsUpdate = true;
     instWispyClouds.instanceMatrix.needsUpdate = true;
     instMegaClouds.instanceMatrix.needsUpdate = true;
-    
+
     // Apply Pastel Colors to Clouds
     let pastelColors = [0xffd1dc, 0xd1ffd1, 0xd1e8ff, 0xfffdd1, 0xe8d1ff];
     const tempCloudColor = new THREE.Color();
@@ -2594,13 +2599,13 @@ let isInitializingGui = true;
     }
     if (instClouds.instanceColor) instClouds.instanceColor.needsUpdate = true;
     if (instHighClouds.instanceColor) instHighClouds.instanceColor.needsUpdate = true;
-    
+
     instFlowers.receiveShadow = false;
     instFlowers.castShadow = false;
     scene.add(instFlowers);
-    
+
     // High-Altitude Distant Clouds (Removed to fix glitchy sky blobs)
-    
+
 
 
     // Initialize all to hidden
@@ -2640,9 +2645,9 @@ let isInitializingGui = true;
     ]);
     geoBird.setAttribute('position', new THREE.BufferAttribute(bVerts, 3));
     geoBird.computeVertexNormals();
-    
+
     const matBird = new THREE.MeshToonMaterial({ color: 0xd6e5f5, side: THREE.DoubleSide, gradientMap });
-    
+
     matBird.onBeforeCompile = (shader) => {
         shader.uniforms.time = { value: 0 };
         shader.vertexShader = `uniform float time;\n` + shader.vertexShader;
@@ -2664,7 +2669,7 @@ let isInitializingGui = true;
     instBirds.frustumCulled = false;
     scene.add(instBirds);
 
-    const birdData = new Float32Array(BIRD_COUNT * 6); 
+    const birdData = new Float32Array(BIRD_COUNT * 6);
     for (let i = 0; i < BIRD_COUNT; i++) {
         birdData[i * 6 + 0] = (Math.random() - 0.5) * 600;
         birdData[i * 6 + 1] = 60 + Math.random() * 80;
@@ -2701,7 +2706,7 @@ let isInitializingGui = true;
     instTrails.frustumCulled = false;
     scene.add(instTrails);
 
-    const trailsData = new Float32Array(100 * 4); 
+    const trailsData = new Float32Array(100 * 4);
     for(let i=0; i<100; i++) {
        trailsData[i*4] = (Math.random() - 0.5) * 80;
        trailsData[i*4+1] = (Math.random() - 0.5) * 60;
@@ -2723,13 +2728,13 @@ let isInitializingGui = true;
                 if (i === j) continue;
                 let dx = px - data[j * 6 + 0], dy = py - data[j * 6 + 1], dz = pz - data[j * 6 + 2];
                 let distSq = dx*dx + dy*dy + dz*dz;
-                
-                if (distSq < 1200) { 
+
+                if (distSq < 1200) {
                     cx += data[j * 6 + 0]; cy += data[j * 6 + 1]; cz += data[j * 6 + 2];
                     ax += data[j * 6 + 3]; ay += data[j * 6 + 4]; az += data[j * 6 + 5];
                     n++;
                 }
-                if (distSq < 400) { 
+                if (distSq < 400) {
                     sx += dx; sy += dy; sz += dz;
                 }
             }
@@ -2744,7 +2749,7 @@ let isInitializingGui = true;
                 vy += (ay - vy) * 0.1 * dt;
                 vz += (az - vz) * 0.1 * dt;
             }
-            
+
             vx += sx * 1.8 * dt; vy += sy * 1.8 * dt; vz += sz * 1.8 * dt;
 
             // Give each bird an offset slot around Kiki so they soar gracefully around her rather than clumping
@@ -2791,12 +2796,30 @@ let isInitializingGui = true;
     const dummy = new THREE.Object3D();
 
     const treeGrid = new Set();
-    const TREE_CELL_SIZE = 55; // Reduced tree density for cleaner scenery and 60 FPS performance
+    const TREE_CELL_SIZE = LOW_GFX ? 40 : 20; // One tree per grid cell — Low stays sparser for weak tablets
     function getTreeCell(x, z) {
         return Math.floor(x / TREE_CELL_SIZE) + '_' + Math.floor(z / TREE_CELL_SIZE);
     }
 
-    const treeDist = 850; // Distance for trees to stream around player
+    const treeDist = TREE_VIEW_DIST; // Distance for trees to stream around player
+
+    // Most slots sit parked at y=-1000 (only ~10% become real trees), but the GPU still
+    // runs every vertex of every slot. Pack live trees to the front and draw only those.
+    function compactTreeInstances(mesh) {
+        const cap = mesh.maxCount || mesh.count;
+        const m = mesh.instanceMatrix.array;
+        const c = mesh.instanceColor ? mesh.instanceColor.array : null;
+        let live = 0;
+        for (let i = 0; i < cap; i++) {
+            if (m[i * 16 + 13] < -500) continue;
+            if (i !== live) {
+                for (let k = 0; k < 16; k++) { const t = m[live * 16 + k]; m[live * 16 + k] = m[i * 16 + k]; m[i * 16 + k] = t; }
+                if (c) for (let k = 0; k < 3; k++) { const t = c[live * 3 + k]; c[live * 3 + k] = c[i * 3 + k]; c[i * 3 + k] = t; }
+            }
+            live++;
+        }
+        mesh.count = live;
+    }
     let isPrewarming = false;
 
     // ==========================================
@@ -2814,22 +2837,22 @@ let isInitializingGui = true;
             );
             this.sphere = new THREE.Sphere();
             this.box.getBoundingSphere(this.sphere);
-            
+
             this.children = null;
             this.isVisible = false;
-            
+
             if (depth < maxDepth) {
                 this.subdivide();
             }
         }
-        
+
         subdivide() {
             const min = this.box.min;
             const max = this.box.max;
             const midX = (min.x + max.x) * 0.5;
             const midY = (min.y + max.y) * 0.5;
             const midZ = (min.z + max.z) * 0.5;
-            
+
             this.children = [
                 new HierarchicalOctreeNode(min.x, min.y, min.z, midX, midY, midZ, this.depth + 1, this.maxDepth),
                 new HierarchicalOctreeNode(midX, min.y, min.z, max.x, midY, midZ, this.depth + 1, this.maxDepth),
@@ -2841,17 +2864,17 @@ let isInitializingGui = true;
                 new HierarchicalOctreeNode(midX, midY, midZ, max.x, max.y, max.z, this.depth + 1, this.maxDepth)
             ];
         }
-        
+
         updateBounds(minX, minY, minZ, maxX, maxY, maxZ) {
             this.box.min.set(minX, minY, minZ);
             this.box.max.set(maxX, maxY, maxZ);
             this.box.getBoundingSphere(this.sphere);
-            
+
             if (this.children) {
                 const midX = (minX + maxX) * 0.5;
                 const midY = (minY + maxY) * 0.5;
                 const midZ = (minZ + maxZ) * 0.5;
-                
+
                 this.children[0].updateBounds(minX, minY, minZ, midX, midY, midZ);
                 this.children[1].updateBounds(midX, minY, minZ, maxX, midY, midZ);
                 this.children[2].updateBounds(minX, midY, minZ, midX, maxY, midZ);
@@ -2862,7 +2885,7 @@ let isInitializingGui = true;
                 this.children[7].updateBounds(midX, midY, midZ, maxX, maxY, maxZ);
             }
         }
-        
+
         cullWithFrustum(frustum) {
             // Fast bounding sphere rejection prunes entire subtree immediately
             if (!frustum.intersectsSphere(this.sphere)) {
@@ -2873,7 +2896,7 @@ let isInitializingGui = true;
                 this.markHidden();
                 return;
             }
-            
+
             this.isVisible = true;
             if (this.children) {
                 for (let i = 0; i < 8; i++) {
@@ -2881,7 +2904,7 @@ let isInitializingGui = true;
                 }
             }
         }
-        
+
         markHidden() {
             this.isVisible = false;
             if (this.children) {
@@ -2890,12 +2913,12 @@ let isInitializingGui = true;
                 }
             }
         }
-        
+
         isPointInFrustum(x, y, z) {
             if (!this.isVisible) return false;
             if (!this.box.containsPoint(_scratchVec3.set(x, y, z))) return false;
             if (!this.children) return this.isVisible;
-            
+
             for (let i = 0; i < 8; i++) {
                 if (this.children[i].isPointInFrustum(x, y, z)) {
                     return true;
@@ -2914,7 +2937,7 @@ let isInitializingGui = true;
             this.lastRootZ = -99999;
         }
 
-        update(cam, playerX, playerZ, maxDist = 850) {
+        update(cam, playerX, playerZ, maxDist = treeDist) {
             if (!cam) return;
             this.projMatrix.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
             this.cameraFrustum.setFromProjectionMatrix(this.projMatrix);
@@ -2922,7 +2945,7 @@ let isInitializingGui = true;
             const step = 80;
             const rx = Math.floor(playerX / step) * step;
             const rz = Math.floor(playerZ / step) * step;
-            
+
             if (Math.abs(rx - this.lastRootX) >= step || Math.abs(rz - this.lastRootZ) >= step) {
                 this.root.updateBounds(rx - maxDist, -30, rz - maxDist, rx + maxDist, 220, rz + maxDist);
                 this.lastRootX = rx;
@@ -2941,19 +2964,19 @@ let isInitializingGui = true;
     const vegOctree = new VegetationHierarchicalOctree();
 
     function updateInstances(playerX, playerZ, time, dt, playerYaw) {
-        const dist = 850; 
-        
+        const dist = treeDist;
+
         // Update Hierarchical Octree spatial partitioning & Camera Frustum
         if (typeof camera !== 'undefined') {
             vegOctree.update(camera, playerX, playerZ, dist);
         }
-        
+
         logicTimer += dt;
         const shouldUpdateTerrain = logicTimer >= (1.0 / 15.0);
         if (shouldUpdateTerrain) {
             logicTimer = 0;
         }
-        
+
         // Clouds
         const cloudScale = 1.0 + Math.min(1.0, Math.max(0.0, (playerGrp.position.y - 300.0) / 11700.0)) * 4.0;
         const cloudDist = 1200 * cloudScale;
@@ -2961,7 +2984,7 @@ let isInitializingGui = true;
         for (let i = 0; i < CLOUD_COUNT; i++) {
             instClouds.getMatrixAt(i, dummy.matrix);
             dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
-            
+
             if (Math.abs(dummy.position.x - playerX) > cloudTeleportDist || Math.abs(dummy.position.z - playerZ) > cloudTeleportDist || dummy.position.y < -500) {
                 const angle = Math.random() * Math.PI * 2.0;
                 const r = cloudDist * (0.6 + Math.random() * 0.38);
@@ -3055,67 +3078,52 @@ let isInitializingGui = true;
             treeMeshes.forEach((instMesh, meshIdx) => {
                 const count = instMesh.maxCount || instMesh.count;
                 let treeUpdated = false;
-                
-                // Update 1/20th of trees per frame for smooth continuous streaming without hitching
-                for (let i = currentFrame % 20; i < count; i += 20) {
+
+                // Update 1/10th of tree slots per tick for smooth continuous streaming without hitching
+                for (let i = currentFrame % 10; i < count; i += 10) {
                     instMesh.getMatrixAt(i, dummy.matrix);
                     dummy.position.setFromMatrixPosition(dummy.matrix);
-                    
-                    const isOutOfRange = Math.abs(dummy.position.x - playerX) > treeDist || 
-                                         Math.abs(dummy.position.z - playerZ) > treeDist || 
+
+                    const tdx = dummy.position.x - playerX, tdz = dummy.position.z - playerZ;
+                    const isOutOfRange = tdx * tdx + tdz * tdz > treeDist * treeDist ||
                                          dummy.position.y < -500;
-                    
-                    // Frustum check using Hierarchical Octree
-                    const isVisibleInFrustum = !isOutOfRange && (dummy.position.y > -100) && 
-                                              vegOctree.isPointInViewFrustum(dummy.position.x, dummy.position.y, dummy.position.z);
-                    
-                    // CRITICAL FOR FPS: If instance is hidden / outside the camera view frustum, completely SKIP instanceMatrix computations
-                    if (!isOutOfRange && dummy.position.y > -100 && !isVisibleInFrustum) {
-                        continue;
-                    }
-                    
+
+                    // In-range trees need no work; only out-of-range slots get respawned below
+
                     if (isOutOfRange) {
                         if (dummy.position.y > 0) {
                             treeGrid.delete(getTreeCell(dummy.position.x, dummy.position.z));
                         }
-                        
+
                         let valid = false;
-                        let nx, nz, h, pathVal, cellKey;
+                        let nx, nz, h, pathVal, cellKey, treeSlope = 0;
                         let attempts = 0;
 
-                        while(!valid && attempts < 14) {
+                        while(!valid && attempts < 6) { // few tries per slot per tick; slots are revisited often
                             // Biased sampling towards visible clusters within the field of view
-                            nx = playerX + (Math.random() - 0.5) * treeDist * 2.0;
-                            nz = playerZ + (Math.random() - 0.5) * treeDist * 2.0;
-                            
+                            const ang = Math.random() * Math.PI * 2.0, rad = treeDist * Math.sqrt(Math.random());
+                            nx = playerX + Math.cos(ang) * rad;
+                            nz = playerZ + Math.sin(ang) * rad;
+
                             // Check if candidate point lies within an in-frustum Hierarchical Octree node
-                            if (vegOctree.isPointInViewFrustum(nx, 10, nz) || attempts > 10) {
-                                h = getWorldHeight(nx, nz);
-                                
+                            if (vegOctree.isPointInViewFrustum(nx, 10, nz) || attempts > 3) {
+                                h = getMeshHeight(nx, nz);
+                                treeSlope = _meshSlope;
+
                                 const curB = getBiomeAt(nx, nz);
                                 const maxH = curB && curB.name.includes('Archipelago') ? 48.0 : 72.0;
                                 const minH = 2.8;
-                                
+
                                 // 1. Altitude check: Above shoreline water (h >= 2.8) and below bare alpine peaks
                                 if (h >= minH && h <= maxH && isTreeZone(nx, nz)) {
-                                    // 2. Slope Check: Compute terrain gradient
-                                    const ds = 1.8;
-                                    const hL = getWorldHeight(nx - ds, nz);
-                                    const hR = getWorldHeight(nx + ds, nz);
-                                    const hD = getWorldHeight(nx, nz - ds);
-                                    const hU = getWorldHeight(nx, nz + ds);
-                                    const slopeX = (hR - hL) / (2.0 * ds);
-                                    const slopeZ = (hU - hD) / (2.0 * ds);
-                                    const slope = Math.sqrt(slopeX * slopeX + slopeZ * slopeZ);
-
-                                    // Natural Slope < 0.36 — Allows lush hillside forests while keeping steep vertical cliffs clear
-                                    if (slope < 0.36) {
+                                    // 2. Slope Check on the drawn ground cell — keeps trees off cliffs and river banks
+                                    if (treeSlope < 0.5) {
                                         pathVal = getPathStrength(nx, nz);
                                         if (pathVal < 0.08) {
                                             // 3. Natural Organic Forest Clustering & Sunny Glades
                                             const forestNoise = snoise(nx * 0.0018, nz * 0.0018) * 0.65 + snoise(nx * 0.006 + 60, nz * 0.006 + 60) * 0.35;
-                                            const isMeadow = forestNoise < 0.10;
-                                            
+                                            const isMeadow = forestNoise < -0.4; // small open glades between dense forests
+
                                             let biomeMatch = true;
 
                                             if (!isMeadow && biomeMatch) {
@@ -3133,25 +3141,26 @@ let isInitializingGui = true;
 
                         if (valid) {
                             treeGrid.add(cellKey);
-                            // Embed trunk slightly (0.25m) into terrain to prevent any floating
-                            dummy.position.set(nx, h - 0.25, nz);
+                            // Sink the trunk deeper on slopes so the downhill side never floats
+                            dummy.position.set(nx, h - 0.8 - treeSlope * 4.0, nz);
                             dummy.rotation.set(0, Math.random() * Math.PI * 2.0, 0); // 360 degree rotation variation
-                            
+
                             let baseS = 0.45 + Math.random() * 0.35;
                             dummy.scale.set(baseS * (0.85 + Math.random() * 0.3), baseS * (0.9 + Math.random() * 0.25), baseS * (0.85 + Math.random() * 0.3));
                             tempTreeColor.setHex(treeGreenVariations[Math.floor(Math.random() * treeGreenVariations.length)]);
                             instMesh.setColorAt(i, tempTreeColor);
                         } else {
-                            dummy.position.set(0, -1000, 0); 
+                            dummy.position.set(0, -1000, 0);
                         }
                         dummy.updateMatrix();
                         instMesh.setMatrixAt(i, dummy.matrix);
                         treeUpdated = true;
                     }
                 }
-                
+
                 // Only submit InstancedMesh GPU updates for modified clusters in view
                 if (treeUpdated) {
+                    compactTreeInstances(instMesh);
                     instMesh.instanceMatrix.needsUpdate = true;
                     if (instMesh.instanceColor) instMesh.instanceColor.needsUpdate = true;
                 }
@@ -3162,17 +3171,17 @@ let isInitializingGui = true;
         for (let i = currentFrame % 5; i < ROCK_COUNT; i += 5) {
             instRocks.getMatrixAt(i, dummy.matrix);
             dummy.position.setFromMatrixPosition(dummy.matrix);
-            
+
             if (Math.abs(dummy.position.x - playerX) > dist || Math.abs(dummy.position.z - playerZ) > dist || dummy.position.y < -500) {
                 const nx = playerX + (Math.random() - 0.5) * dist * 2.0;
                 const nz = playerZ + (Math.random() - 0.5) * dist * 2.0;
                 const h = getWorldHeight(nx, nz);
 
-                if (h > 0.0 && getPathStrength(nx, nz) < 0.1) { 
+                if (h > 0.0 && getPathStrength(nx, nz) < 0.1) {
                     dummy.position.set(nx, h, nz);
                     dummy.rotation.set(Math.random(), Math.random(), Math.random());
                     // Uneven scaling creates distinct natural boulders
-                    dummy.scale.set(0.7 + Math.random() * 2.0, 0.5 + Math.random() * 1.5, 0.7 + Math.random() * 2.0); 
+                    dummy.scale.set(0.7 + Math.random() * 2.0, 0.5 + Math.random() * 1.5, 0.7 + Math.random() * 2.0);
                 } else {
                     dummy.position.set(0, -1000, 0);
                 }
@@ -3187,11 +3196,11 @@ let isInitializingGui = true;
         for (let i = currentFrame % 10; i < BUSH_COUNT; i += 10) {
             instBushes.getMatrixAt(i, dummy.matrix);
             dummy.position.setFromMatrixPosition(dummy.matrix);
-            
+
             if (Math.abs(dummy.position.x - playerX) > dist || Math.abs(dummy.position.z - playerZ) > dist || dummy.position.y < -500) {
                 const nx = playerX + (Math.random() - 0.5) * dist * 2.0;
                 const nz = playerZ + (Math.random() - 0.5) * dist * 2.0;
-                
+
                 // Only process bushes in visible frustum
                 if (vegOctree.isPointInViewFrustum(nx, 10, nz)) {
                     const h = getWorldHeight(nx, nz);
@@ -3219,11 +3228,11 @@ let isInitializingGui = true;
         for (let i = currentFrame % 10; i < FLOWER_COUNT; i += 10) {
             instFlowers.getMatrixAt(i, dummy.matrix);
             dummy.position.setFromMatrixPosition(dummy.matrix);
-            
+
             if (Math.abs(dummy.position.x - playerX) > dist || Math.abs(dummy.position.z - playerZ) > dist || dummy.position.y < -500) {
                 const nx = playerX + (Math.random() - 0.5) * dist * 2.0;
                 const nz = playerZ + (Math.random() - 0.5) * dist * 2.0;
-                
+
                 // Only process flowers in visible frustum
                 if (vegOctree.isPointInViewFrustum(nx, 10, nz)) {
                     const h = getWorldHeight(nx, nz);
@@ -3249,7 +3258,7 @@ let isInitializingGui = true;
                 flowersUpdated = true;
             }
         }
-            
+
             if (rocksUpdated) instRocks.instanceMatrix.needsUpdate = true;
             if (bushesUpdated) instBushes.instanceMatrix.needsUpdate = true;
             if (flowersUpdated) { instFlowers.instanceMatrix.needsUpdate = true; instFlowers.instanceColor.needsUpdate = true; }
@@ -3331,17 +3340,23 @@ let isInitializingGui = true;
         mergedGeom.computeBoundingBox();
         mergedGeom.computeBoundingSphere();
 
-        // Single toon material with vertex colors — 1 draw call
-        const mergedMat = new THREE.MeshToonMaterial({
-            vertexColors: true,
-            gradientMap: gradientMap,
-            side: THREE.DoubleSide,
-            dithering: true
-        });
+        // Light model for distant trees: bark/branches (most of the triangles) replaced by a 5-sided trunk
+        const trunk = new THREE.CylinderGeometry(targetHeight * 0.022, targetHeight * 0.035, targetHeight * 0.5, 5, 1, true);
+        trunk.translate(0, targetHeight * 0.25, 0);
+        const trunkColors = new Float32Array(trunk.attributes.position.count * 3);
+        for (let i = 0; i < trunkColors.length; i += 3) {
+            trunkColors[i] = partColors[0].r; trunkColors[i + 1] = partColors[0].g; trunkColors[i + 2] = partColors[0].b;
+        }
+        trunk.setAttribute('color', new THREE.BufferAttribute(trunkColors, 3));
+        const liteGeom = coloredGeos.length > 1
+            ? BufferGeometryUtils.mergeGeometries([trunk, ...coloredGeos.slice(1)], false)
+            : null;
+        if (liteGeom) { liteGeom.computeBoundingBox(); liteGeom.computeBoundingSphere(); }
 
         targetInstancedMeshes.forEach(instMesh => {
-            instMesh.geometry = mergedGeom;
-            instMesh.material = mergedMat;
+            instMesh.geometry = liteGeom || mergedGeom;
+            instMesh.material = matTree;
+            if (instMesh.userData.near) instMesh.userData.near.geometry = mergedGeom;
             instMesh.instanceColor = null;
         });
     }
@@ -3354,15 +3369,6 @@ let isInitializingGui = true;
         applyGLBPineTree(gltf, [instTree2, instTree4], 8.5);
     }, undefined, (err) => console.warn("Could not load Pine_1_ultra_fast.glb:", err));
 
-    gltfLoader.load('assets/tree_oak1.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instOak1], 7.8);
-    }, undefined, (err) => console.warn("Could not load tree_oak1.glb:", err));
-    gltfLoader.load('assets/tree_oak2.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instOak2], 8.8);
-    }, undefined, (err) => console.warn("Could not load tree_oak2.glb:", err));
-    gltfLoader.load('assets/tree_oak3.glb', (gltf) => {
-        applyGLBPineTree(gltf, [instOak3], 9.5);
-    }, undefined, (err) => console.warn("Could not load tree_oak3.glb:", err));
 
     gltfLoader.load(
         'kiki-lowpoly.glb',
@@ -3373,15 +3379,15 @@ let isInitializingGui = true;
             box.getSize(size);
             const center = new THREE.Vector3();
             box.getCenter(center);
-            
+
             const maxDim = Math.max(size.x, size.y, size.z);
             const targetScale = maxDim > 0 ? (2.0 / maxDim) : 1.0;
             kikiModel.scale.set(targetScale, targetScale, targetScale);
-            
+
             kikiModel.position.x = -center.x * targetScale;
             kikiModel.position.y = -center.y * targetScale;
             kikiModel.position.z = -center.z * targetScale;
-            
+
             kikiModel.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
@@ -3407,15 +3413,15 @@ let isInitializingGui = true;
             box.getSize(size);
             const center = new THREE.Vector3();
             box.getCenter(center);
-            
+
             const maxDim = Math.max(size.x, size.y, size.z);
             const targetScale = maxDim > 0 ? (6.0 / maxDim) : 1.0;
             whaleModel.scale.set(targetScale, targetScale, targetScale);
-            
+
             whaleModel.position.x = -center.x * targetScale;
             whaleModel.position.y = -center.y * targetScale;
             whaleModel.position.z = -center.z * targetScale;
-            
+
             whaleModel.traverse((child) => {
                 if (child.isMesh) {
                     child.castShadow = true;
@@ -3425,7 +3431,7 @@ let isInitializingGui = true;
             whaleModel.rotation.y = Math.PI;
             whaleModel.visible = (currentCharacter === 'whale');
             playerVisuals.add(whaleModel);
-            
+
             if (gltf.animations && gltf.animations.length > 0) {
                 whaleMixer = new THREE.AnimationMixer(whaleModel);
                 whaleMixer.clipAction(gltf.animations[0]).play();
@@ -3435,11 +3441,11 @@ let isInitializingGui = true;
         (err) => console.warn("Could not load Princess.glb:", err)
     );
 
-    
 
 
 
-    
+
+
     // ==========================================
     // 8. INPUTS (Keyboard & Touch)
     // ==========================================
@@ -3467,7 +3473,7 @@ let isInitializingGui = true;
         if(e.key.toLowerCase() === 'h') {
             uiVisible = !uiVisible;
             if (typeof gui !== 'undefined') gui.domElement.style.display = uiVisible ? 'block' : 'none';
-            
+
 
         }
         if(e.key.toLowerCase() === 'v') {
@@ -3504,17 +3510,17 @@ let isInitializingGui = true;
         if (e.touches.length === 1) {
             const touch = e.changedTouches[0];
             activeTouchId = touch.identifier;
-            
+
             // Move joyBase to touch point
             joyBase.style.left = (touch.clientX - 50) + 'px';
             joyBase.style.top = (touch.clientY - 50) + 'px';
             joyBase.style.bottom = 'auto';
             joyBase.style.opacity = '1';
-            
+
             updateJoystick(touch);
         } else if (e.touches.length === 2) {
             resetJoystick();
-            
+
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             initialPinchDist = Math.sqrt(dx*dx + dy*dy);
@@ -3530,10 +3536,10 @@ let isInitializingGui = true;
             const dx = e.touches[0].clientX - e.touches[1].clientX;
             const dy = e.touches[0].clientY - e.touches[1].clientY;
             const newDist = Math.sqrt(dx*dx + dy*dy);
-            
+
             cameraZoomDist = initialZoomDist * (initialPinchDist / newDist);
             cameraZoomDist = Math.max(5.0, Math.min(100.0, cameraZoomDist));
-            
+
             if (cameraZoomDist > 25.0) document.getElementById('zoom-toggle').innerText = 'Zoom In';
             else document.getElementById('zoom-toggle').innerText = 'Zoom Out';
         } else {
@@ -3595,7 +3601,7 @@ let isInitializingGui = true;
     // ==========================================
     // 9. FLIGHT PHYSICS & RENDER LOOP
     // ==========================================
-    let velocity = 15.0; 
+    let velocity = 15.0;
     let pitch = 0, yaw = 0, roll = 0;
     const BASE_FOV = 60;
     const clock = new THREE.Clock();
@@ -3611,7 +3617,7 @@ let isInitializingGui = true;
         const v = Math.random();
         const theta = u * 2.0 * Math.PI;
         const phi = Math.acos(2.0 * v - 1.0);
-        
+
         const y = radius * Math.cos(phi);
         const x = radius * Math.sin(phi) * Math.cos(theta);
         const z = radius * Math.sin(phi) * Math.sin(theta);
@@ -3628,20 +3634,23 @@ let isInitializingGui = true;
         sizeAttenuation: false,
         fog: false, // Prevents scene fog from hiding the stars
         transparent: true,
+        depthWrite: false, // invisible stars were punching holes in clouds drawn after them
         opacity: 0.0 // Start invisible — lerps to target based on time-of-day
     });
     const starField = new THREE.Points(starGeometry, starMaterial);
+    starField.visible = false;
+    starField.renderOrder = -900; // right after the sky dome, so clouds are drawn over the stars
     scene.add(starField);
 
     // --- Camera Rig Hierarchy ---
-    const cameraBase = new THREE.Group(); 
+    const cameraBase = new THREE.Group();
     scene.add(cameraBase);
 
-    const cameraPivot = new THREE.Group(); 
+    const cameraPivot = new THREE.Group();
     cameraPivot.rotation.order = 'YXZ';
     cameraBase.add(cameraPivot);
 
-    camera.position.set(0, 4, 12); 
+    camera.position.set(0, 4, 12);
     cameraPivot.add(camera);
 
     // --- Pan Event Listeners (Handles Mouse & Mobile Touch Screen) ---
@@ -3661,7 +3670,7 @@ let isInitializingGui = true;
         // Orbit the pivot
         cameraPivot.rotation.y -= deltaX * 0.004;
         cameraPivot.rotation.x -= deltaY * 0.004;
-        
+
         // Clamp vertical look to prevent the camera from flipping upside down
         cameraPivot.rotation.x = Math.max(-Math.PI / 4, Math.min(Math.PI / 6, cameraPivot.rotation.x));
 
@@ -3679,15 +3688,15 @@ let isInitializingGui = true;
 
     // --- 4. Movement Variables ---
     const moveSpeed = 18;
-    const turnAcceleration = 0.55; 
-    const maxTurnSpeed = 0.45;     
-    const maxBankAngle = Math.PI / 7; 
-    const maxPitchAngle = Math.PI / 4; 
+    const turnAcceleration = 0.55;
+    const maxTurnSpeed = 0.45;
+    const maxBankAngle = Math.PI / 7;
+    const maxPitchAngle = Math.PI / 4;
 
-    let currentYaw = 0;   
+    let currentYaw = 0;
     let currentPitch = 0;
-    let currentRoll = 0;  
-    let turnVelocity = 0; 
+    let currentRoll = 0;
+    let turnVelocity = 0;
 
     const targetQuaternion = new THREE.Quaternion();
     const eulerRotation = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -3717,41 +3726,41 @@ let isInitializingGui = true;
         } else if (inputState.right) {
             turnVelocity -= turnAcceleration * delta;
         } else {
-            turnVelocity = THREE.MathUtils.lerp(turnVelocity, 0, 3.5 * delta); 
+            turnVelocity = THREE.MathUtils.lerp(turnVelocity, 0, 3.5 * delta);
         }
-        
+
         turnVelocity = Math.max(-maxTurnSpeed, Math.min(maxTurnSpeed, turnVelocity));
         currentYaw += turnVelocity * delta;
 
         // Banking
         let targetRoll = (turnVelocity / maxTurnSpeed) * maxBankAngle;
-        currentRoll = THREE.MathUtils.lerp(currentRoll, targetRoll, 1.5 * delta); 
+        currentRoll = THREE.MathUtils.lerp(currentRoll, targetRoll, 1.5 * delta);
 
         // Altitude Control
         let targetPitch = -0.18; // Default
-        if (inputState.up) { 
-            targetPitch = maxPitchAngle; 
+        if (inputState.up) {
+            targetPitch = maxPitchAngle;
         } else if (inputState.down) {
-            targetPitch = -maxPitchAngle; 
+            targetPitch = -maxPitchAngle;
         }
         currentPitch = THREE.MathUtils.lerp(currentPitch, targetPitch, 1.5 * delta);
 
         // Apply Rotations
         eulerRotation.set(currentPitch, currentYaw, currentRoll, 'YXZ');
         targetQuaternion.setFromEuler(eulerRotation);
-        
+
         // Soft camera auto-leveling
         if (!inputState.left && !inputState.right && !inputState.up && !inputState.down) {
-            character.quaternion.slerp(targetQuaternion, 1.2 * delta); 
+            character.quaternion.slerp(targetQuaternion, 1.2 * delta);
         } else {
-            character.quaternion.slerp(targetQuaternion, 5.0 * delta); 
+            character.quaternion.slerp(targetQuaternion, 5.0 * delta);
         }
 
         // Forward Flight & Speed Boost
-        _scratchMovementDirection.set(0, 0, -1); 
+        _scratchMovementDirection.set(0, 0, -1);
         _scratchMovementDirection.applyQuaternion(character.quaternion);
-        
-        let activeSpeed = globalVelocity; 
+
+        let activeSpeed = globalVelocity;
         character.position.addScaledVector(_scratchMovementDirection, activeSpeed * delta);
 
         if (capyFlyTarget && capyFlyTarget.placed) {
@@ -3781,29 +3790,84 @@ let isInitializingGui = true;
         }
 
         // Anti-Clipping Floor Constraint (Metric calculation)
-        const minimumFlightHeight = 18; 
+        const minimumFlightHeight = 18;
         if (character.position.y < minimumFlightHeight) {
             character.position.y = minimumFlightHeight;
         }
 
         // Camera Base Tracking
         cameraBase.position.copy(character.position);
-        
-        eulerRotation.set(0, currentYaw, 0, 'YXZ'); 
+
+        eulerRotation.set(0, currentYaw, 0, 'YXZ');
         baseTargetQuat.setFromEuler(eulerRotation);
-        
-        cameraBase.quaternion.slerp(baseTargetQuat, 2.8 * delta); 
-        
+
+        cameraBase.quaternion.slerp(baseTargetQuat, 2.8 * delta);
+
         // Auto-leveling for camera tilt
         camera.quaternion.slerp(_scratchZeroQuat, 2.0 * delta);
     }
 
 
     let envConfigs = [
-        {bg: 0x8cbce6, fog: 0x8cbce6, amb: 0xdcf2ff, dir: 0xfffaeb, ambI: 0.9, dirI: 2.5, starOp: 0, sunY: 1500, moonY: -1500, glintCol: 0xfff0d0, cloudCol: 0xfffaec, crystalGlowMult: 0.0}, // Day (0.0 emissive contribution)
-        {bg: 0xffa07a, fog: 0xffa07a, amb: 0xffdab9, dir: 0xffaa00, ambI: 1.1, dirI: 3.2, starOp: 0, sunY: 160, moonY: 200, glintCol: 0xffaa00, cloudCol: 0xffc090, crystalGlowMult: 0.45}, // Dusk
-        {bg: 0x162d5a, fog: 0x224888, amb: 0x7788bb, dir: 0xffbb55, ambI: 1.5, dirI: 3.5, starOp: 1.0, sunY: -8000, moonY: 1600, glintCol: 0xffaa44, cloudCol: 0x2e4a80, crystalGlowMult: 1.0}, // Twilight / Night (full configured multiplier)
+        {bg: 0x2f6cc4, skyMid: 0x6aa6e0, skyHorizon: 0xbcdcf2, horizonGlow: 0.15, amb: 0xdcf2ff, dir: 0xfffaeb, ambI: 0.9, dirI: 2.5, starOp: 0, sunY: 1500, moonY: -1500, glintCol: 0xfff0d0, cloudCol: 0xfffaec, crystalGlowMult: 0.0}, // Day (0.0 emissive contribution)
+        {bg: 0x3a2350, skyMid: 0xc4344a, skyHorizon: 0xf2803c, horizonGlow: 0.45, amb: 0xffdab9, dir: 0xffaa00, ambI: 1.1, dirI: 3.2, starOp: 0, sunY: 160, moonY: 200, glintCol: 0xffaa00, cloudCol: 0xffc090, crystalGlowMult: 0.45}, // Dusk
+        {bg: 0x08102a, skyMid: 0x142a58, skyHorizon: 0x2a4a82, horizonGlow: 0.1, amb: 0x7788bb, dir: 0xffbb55, ambI: 1.5, dirI: 3.5, starOp: 1.0, sunY: -8000, moonY: 1600, glintCol: 0xffaa44, cloudCol: 0x2e4a80, crystalGlowMult: 1.0}, // Twilight / Night (full configured multiplier)
     ];
+    const skyUniforms = {
+        uZenith: { value: new THREE.Color(envConfigs[0].bg) },
+        uMid: { value: new THREE.Color(envConfigs[0].skyMid) },
+        uHorizon: { value: new THREE.Color(envConfigs[0].skyHorizon) },
+        uHorizonGlow: { value: envConfigs[0].horizonGlow },
+        uGradientPower: { value: 1.1 },
+        uGradientMidOffset: { value: 0.25 },
+        uGradientSkyEnabled: { value: 1.0 },
+    };
+    const skyMaterial = new THREE.ShaderMaterial({
+        uniforms: skyUniforms,
+        vertexShader: `
+            varying vec3 vDir;
+            void main() {
+                vec4 wp = modelMatrix * vec4(position, 1.0);
+                vDir = wp.xyz - cameraPosition;
+                gl_Position = projectionMatrix * viewMatrix * wp;
+            }`,
+        fragmentShader: `
+            uniform vec3 uZenith, uMid, uHorizon;
+            uniform float uHorizonGlow, uGradientPower, uGradientMidOffset, uGradientSkyEnabled;
+            varying vec3 vDir;
+            void main() {
+                vec3 dir = normalize(vDir);
+                // Start the gradient a little above the horizon: that thin band stays the exact
+                // fog colour, so fully fogged hills and objects melt into the sky
+                float alt = clamp((dir.y - 0.05) / 0.95, 0.0, 1.0);
+
+                // 3-stop gradient: horizon -> mid (up to Mid-Height Offset) -> zenith
+                float tLower = clamp(alt / max(uGradientMidOffset, 0.01), 0.0, 1.0);
+                float tUpper = clamp((alt - uGradientMidOffset) / max(1.0 - uGradientMidOffset, 0.01), 0.0, 1.0);
+                vec3 lowerSky = mix(uHorizon, uMid, pow(tLower, uGradientPower));
+                vec3 gradientSky = mix(lowerSky, uZenith, pow(tUpper, uGradientPower));
+
+                // Simple 2-stop fallback when the gradient curve is disabled
+                vec3 twoStopSky = mix(uHorizon, uZenith, pow(clamp(alt * 1.5, 0.0, 1.0), 0.6));
+                vec3 sky = mix(twoStopSky, gradientSky, uGradientSkyEnabled);
+
+                // Horizon band glow, kept off the fog band
+                sky += pow(1.0 - abs(dir.y), 3.0) * uHorizon * uHorizonGlow * smoothstep(0.03, 0.12, dir.y);
+                gl_FragColor = vec4(sky, 1.0);
+                #include <colorspace_fragment>
+            }`,
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+    });
+    const skyDome = new THREE.Mesh(new THREE.SphereGeometry(25000, 32, 16), skyMaterial);
+    skyDome.renderOrder = -1000;
+    skyDome.frustumCulled = false;
+    scene.add(skyDome);
+    const _skyCol = new THREE.Color();
+    const _scratchSkyPos = new THREE.Vector3();
+
     let currentSunY = 1500;
     let currentMoonY = -1500;
     let currentFps = 60;
@@ -3818,15 +3882,15 @@ let isInitializingGui = true;
         if (params.showMap) _drawWorldMap();
         let dt = Math.min(clock.getDelta(), 0.1);
         const time = clock.getElapsedTime();
-        
 
-        
+
+
         waterUniforms.uTime.value = time;
         if (typeof treeUniforms !== 'undefined') {
             treeUniforms.uPlayerPos.value.copy(playerGrp.position);
         }
 
-        
+
         currentFrame++;
         framesThisSecond++;
         const currentGroundY = getWorldHeight(playerGrp.position.x, playerGrp.position.z);
@@ -3849,22 +3913,28 @@ let isInitializingGui = true;
             }
         }
 
-        
+
         // 3-Stage Lighting Engine Lerp
         const target = envConfigs[timePhase];
         scene.background.lerp(_scratchBgColor.set(target.bg), dt * 2);
-        scene.fog.color.lerp(_scratchFogColor.set(target.fog), dt * 2);
-        
+        scene.fog.color.lerp(_scratchFogColor.set(target.skyHorizon), dt * 2); // must match the sky horizon band
+        skyDome.position.copy(camera.getWorldPosition(_scratchSkyPos));
+        skyUniforms.uZenith.value.lerp(_skyCol.set(target.bg), dt * 2);
+        skyUniforms.uMid.value.lerp(_skyCol.set(target.skyMid), dt * 2);
+        skyUniforms.uHorizon.value.lerp(_skyCol.set(target.skyHorizon), dt * 2);
+        skyUniforms.uHorizonGlow.value += (target.horizonGlow - skyUniforms.uHorizonGlow.value) * dt * 2;
+
         // Distance fog — must hide terrain edges at ±2000 units from center
         const fogAltitude = Math.max(0, playerGrp.position.y);
-        
+
         // Pin background elements to player (Removed super clouds)
-        
+
         ambientLight.color.lerp(_scratchAmbColor.set(target.amb), dt * 2);
         ambientLight.intensity += (target.ambI - ambientLight.intensity) * dt * 2;
         dirLight.color.lerp(_scratchDirColor.set(target.dir), dt * 2);
         dirLight.intensity += (target.dirI - dirLight.intensity) * dt * 2;
         starMaterial.opacity += (target.starOp - starMaterial.opacity) * dt * 2;
+        starField.visible = starMaterial.opacity > 0.01; // not drawn at all during the day
 
 
 
@@ -3879,21 +3949,21 @@ let isInitializingGui = true;
         const crystalDist = 2400;
         const curPlayerB = typeof playerGrp !== 'undefined' ? getBiomeAt(playerGrp.position.x, playerGrp.position.z) : null;
         const inCrystalLand = curPlayerB && (curPlayerB.id === 'crystal_land' || curPlayerB.id === 'magical_sanctuary');
-        
+
         if (typeof matCrystal !== 'undefined' && matCrystal.userData.shader) {
             matCrystal.userData.shader.uniforms.uTime.value = time;
-            
+
             // Connect configured nightGlowMult in terrain-crystal.js to environment timePhase
             const configuredMult = (typeof terrainCrystal !== 'undefined' && typeof terrainCrystal.nightGlowMult === 'number')
                 ? terrainCrystal.nightGlowMult
                 : 1.5;
-            
+
             const phaseRatio = (typeof target.crystalGlowMult === 'number')
                 ? target.crystalGlowMult
                 : ((timePhase === 2) ? 1.0 : ((timePhase === 1) ? 0.45 : 0.0));
-                
+
             const targetEmissiveMult = phaseRatio * configuredMult;
-            
+
             // Interpolate smoothly using the existing time-lerp architecture (dt * 2)
             if (matCrystal.userData.shader.uniforms.nightGlowMult) {
                 const curMult = matCrystal.userData.shader.uniforms.nightGlowMult.value;
@@ -3929,7 +3999,7 @@ let isInitializingGui = true;
 
         const targetSpeed = isBraking ? 0.0 : (isBoosting ? 250.0 : 18.0); // Extreme super speed
         velocity += (targetSpeed - velocity) * dt * (isBraking ? 3.0 : (isBoosting ? 1.5 : 1.0));
-        
+
         const inputState = {
             forward: true,
             up: keys.w || touchState.y < -0.1,
@@ -3944,7 +4014,7 @@ let isInitializingGui = true;
         const groundY = getWorldHeight(playerGrp.position.x, playerGrp.position.z);
         playerGrp.position.y = Math.min(Math.max(playerGrp.position.y, 18), 3500);
         cameraBase.position.lerp(playerGrp.position, dt * 7.0); // Re-sync camera position
-        
+
         // --- Camera Collision Prevention ---
         // --- Camera Collision Prevention & Zoom ---
         camera.getWorldPosition(_scratchIdealCamPos);
@@ -3952,15 +4022,15 @@ let isInitializingGui = true;
         _scratchDirToCam.subVectors(_scratchIdealCamPos, _scratchPlayerPos);
         const distToCam = _scratchDirToCam.length();
         _scratchDirToCam.normalize();
-        
+
         const defaultCamDist = cameraZoomDist;
         const defaultCamHeight = cameraZoomDist * 0.33;
-        
+
         // Smoothly lerp camera to default distance
         camera.position.z = THREE.MathUtils.lerp(camera.position.z, defaultCamDist, dt * 5.0);
         camera.position.y = THREE.MathUtils.lerp(camera.position.y, defaultCamHeight, dt * 5.0);
         // -----------------------------------
-        
+
         starField.position.copy(playerGrp.position); // Track player to create infinite distance illusion
         const targetMinY = groundY + 55; // Keep above trees and terrain
         if (playerGrp.position.y < targetMinY) {
@@ -3968,12 +4038,12 @@ let isInitializingGui = true;
             const swoopPitch = Math.min(Math.PI / 4, depth / 40.0);
             currentPitch = THREE.MathUtils.lerp(currentPitch, swoopPitch, dt * 3.0);
             playerGrp.rotation.set(currentPitch, currentYaw, 0, 'YXZ');
-            
+
             if (playerGrp.position.y < groundY + 15) {
                 playerGrp.position.y += (groundY + 15 - playerGrp.position.y) * dt * 5.0;
             }
         }
-        
+
         playerGrp.position.y = Math.min(Math.max(playerGrp.position.y, 18), 3500);
         cameraBase.position.lerp(playerGrp.position, dt * 7.0); // Re-sync camera position
         starField.position.copy(playerGrp.position); // Track player to create infinite distance illusion
@@ -3984,16 +4054,16 @@ let isInitializingGui = true;
         if (params.showTerrain) updateTerrainGeometry(playerGrp.position.x, playerGrp.position.z);
         waterMesh.position.x = playerGrp.position.x;
         waterMesh.position.z = playerGrp.position.z;
-        
+
         if(typeof window.fogGroup !== 'undefined' && window.fogGroup.visible) {
             window.fogUniforms.uTime.value = time;
-            // The planes follow the player, but the noise shader uses world coordinates, 
+            // The planes follow the player, but the noise shader uses world coordinates,
             // so the noise texture slides perfectly across the planes, anchored to the world!
             window.fogGroup.position.x = playerGrp.position.x;
             window.fogGroup.position.z = playerGrp.position.z;
             // Tint fog slightly towards sun color during sunrise/sunset
             const currentFogMat = window.fogGroup.children[0].material;
-            currentFogMat.color.lerp(scene.fog.color, 0.01); 
+            currentFogMat.color.lerp(scene.fog.color, 0.01);
         }
 
         camera.fov = THREE.MathUtils.lerp(camera.fov, isBoosting ? BASE_FOV + 12 : BASE_FOV, dt * 5.0);
@@ -4033,16 +4103,16 @@ let isInitializingGui = true;
         if (typeof highCloudMat !== 'undefined') highCloudMat.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
         if (typeof megaCloudMat !== 'undefined') megaCloudMat.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
         if (typeof matWispyCloud !== 'undefined') matWispyCloud.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
-        
+
         // Dynamically scale up the terrain and water as Kiki flies high
         terrainScale = 1.0 + Math.min(1.0, Math.max(0.0, (playerGrp.position.y - 300.0) / 11700.0)) * 9.0;
         waterMesh.scale.set(terrainScale, 1.0, terrainScale);
 
         // Scale render distance (fog far) to reveal landscape when high
-        // Setting it to 850 guarantees that the edge of the world (1200) and tree spawn distance (900) are fully hidden in fog!
-        const dynamicFar = 800 + Math.max(0, playerGrp.position.y - 300.0) * 2.2;
-        const dynamicNear = 10 + Math.max(0, playerGrp.position.y - 300.0) * 0.4;
-        
+        // Near the ground fog is opaque by TREE_VIEW_DIST, so trees streaming in/out are never seen
+        const dynamicFar = TREE_VIEW_DIST - 20.0 + Math.max(0, playerGrp.position.y - 300.0) * 2.2;
+        const dynamicNear = 60 + Math.max(0, playerGrp.position.y - 300.0) * 0.4;
+
         scene.fog.far += (dynamicFar - scene.fog.far) * dt * 2.0;
         scene.fog.near += (dynamicNear - scene.fog.near) * dt * 2.0;
 
@@ -4064,25 +4134,26 @@ let isInitializingGui = true;
         }
 
         updateInstances(playerGrp.position.x, playerGrp.position.z, time, dt, currentYaw);
+        if (currentFrame % 4 === 0) updateTreeLOD(playerGrp.position.x, playerGrp.position.z);
         updateBirds(playerGrp.position.x, playerGrp.position.y, playerGrp.position.z, time, dt);
         if (typeof updateCapybaras === 'function') {
             updateCapybaras(playerGrp.position, dt, time);
         }
-        
+
         if (isWindTrailsOn && isWindOn) {
             instTrails.visible = true;
             const trailOpacity = isBoosting ? 0.22 : 0.08;
             trailMat.opacity = trailOpacity;
             for (let i = 0; i < 100; i++) {
                 let z = trailsData[i*4+2];
-                z += velocity * 3.0 * dt; 
+                z += velocity * 3.0 * dt;
                 if (z > 50) {
                      z -= 100;
                      trailsData[i*4] = (Math.random() - 0.5) * 80;
                      trailsData[i*4+1] = (Math.random() - 0.5) * 60;
                 }
                 trailsData[i*4+2] = z;
-                
+
                 dummy.position.set(trailsData[i*4], trailsData[i*4+1], z);
                 dummy.position.x += Math.sin(time * 3.0 + trailsData[i*4+3] * 10) * 0.5;
                 dummy.position.y += Math.cos(time * 3.0 + trailsData[i*4+3] * 10) * 0.5;
@@ -4102,11 +4173,11 @@ let isInitializingGui = true;
             if (!isWindOn || !isBoosting) {
                 windGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.15);
             } else {
-                const speedFactor = Math.max(0, Math.min(1, (velocity - 15) / 30)); 
+                const speedFactor = Math.max(0, Math.min(1, (velocity - 15) / 30));
                 const targetVolume = 0.25 + speedFactor * 0.35;
                 windGain.gain.setTargetAtTime(targetVolume, audioCtx.currentTime, 0.1);
-                
-                const targetFreq = 400 + Math.sin(time) * 100 + speedFactor * 800; 
+
+                const targetFreq = 400 + Math.sin(time) * 100 + speedFactor * 800;
                 windFilter.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
             }
         }
@@ -4129,6 +4200,7 @@ let isInitializingGui = true;
             godRaysPass.uniforms.uSunVisible.value = behindCamera * screenFade * twilightFade;
         }
 
+        renderer.info.reset(); // count every composer pass, not just the last full-screen quad
         composer.render();
         if (renderer.info) {
             lastRecordedCalls = renderer.info.render.calls;
@@ -4144,7 +4216,7 @@ let isInitializingGui = true;
     });
 
     let timePhase = 0; // 0: Day, 1: Dusk, 2: Deep Twilight
-    
+
     // ... lighting targets for lerping
     const envTargets = {
         bg: new THREE.Color(),
@@ -4152,7 +4224,7 @@ let isInitializingGui = true;
         amb: new THREE.Color(),
         dir: new THREE.Color(),
     };
-    
+
     const timeToggleBtn = document.getElementById('time-toggle');
     if (timeToggleBtn) {
         timeToggleBtn.addEventListener('click', () => {
@@ -4174,31 +4246,31 @@ let isInitializingGui = true;
         if (audioCtx) return;
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         if (!AudioContext) return;
-        
+
         audioCtx = new AudioContext();
-        
-        const bufferSize = audioCtx.sampleRate * 2; 
+
+        const bufferSize = audioCtx.sampleRate * 2;
         const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-            output[i] = Math.random() * 2 - 1; 
+            output[i] = Math.random() * 2 - 1;
         }
-        
+
         const noiseSource = audioCtx.createBufferSource();
         noiseSource.buffer = noiseBuffer;
         noiseSource.loop = true;
-        
+
         windFilter = audioCtx.createBiquadFilter();
         windFilter.type = 'lowpass';
-        windFilter.frequency.value = 400; 
-        
+        windFilter.frequency.value = 400;
+
         windGain = audioCtx.createGain();
         windGain.gain.value = 0;
-        
+
         noiseSource.connect(windFilter);
         windFilter.connect(windGain);
         windGain.connect(audioCtx.destination);
-        
+
         noiseSource.start();
     }
 
@@ -4212,112 +4284,112 @@ let isInitializingGui = true;
     let currentTrack = 0;
     let nextNoteTime = 0;
     let musicTimerID;
-    
+
     let chordIndex = 0;
     let sequenceTime = 0;
     let arpIndex = 0;
 
     const tracks = [
-        { 
-            name: "Spirited Winds", 
+        {
+            name: "Spirited Winds",
             chords: [
                 [174.61, 220.00, 261.63, 329.63], // Fmaj7
                 [196.00, 246.94, 293.66, 349.23], // G7
                 [164.81, 196.00, 246.94, 293.66], // Em7
                 [220.00, 261.63, 329.63, 392.00]  // Am7
             ],
-            speed: 2400, 
+            speed: 2400,
             stepSpeed: 300,
             padOsc: 'triangle',
             leadOsc: 'sine'
         },
-        { 
-            name: "Summer Clouds", 
+        {
+            name: "Summer Clouds",
             chords: [
                 [261.63, 329.63, 392.00, 493.88], // Cmaj7
                 [196.00, 246.94, 293.66, 392.00], // G
                 [220.00, 261.63, 329.63, 392.00], // Am7
                 [174.61, 220.00, 261.63, 329.63]  // Fmaj7
             ],
-            speed: 3200, 
+            speed: 3200,
             stepSpeed: 400,
             padOsc: 'sawtooth',
             leadOsc: 'triangle'
         },
-        { 
-            name: "Evening Whispers", 
+        {
+            name: "Evening Whispers",
             chords: [
                 [220.00, 261.63, 329.63, 493.88], // Am9
                 [174.61, 220.00, 261.63, 392.00], // Fmaj9
                 [261.63, 329.63, 392.00, 493.88], // Cmaj7
                 [164.81, 207.65, 246.94, 293.66]  // E7
             ],
-            speed: 2800, 
+            speed: 2800,
             stepSpeed: 350,
             padOsc: 'sine',
             leadOsc: 'sine'
         },
-        { 
-            name: "Wandering Spirits", 
+        {
+            name: "Wandering Spirits",
             chords: [
                 [261.63, 329.63, 392.00, 523.25], // C
                 [174.61, 220.00, 261.63, 349.23], // F
                 [196.00, 246.94, 293.66, 392.00], // G
                 [220.00, 261.63, 329.63, 440.00]  // Am
             ],
-            speed: 2000, 
+            speed: 2000,
             stepSpeed: 250,
             padOsc: 'triangle',
             leadOsc: 'triangle'
         },
-        { 
-            name: "Star Ocean", 
+        {
+            name: "Star Ocean",
             chords: [
                 [293.66, 369.99, 440.00, 554.37], // Dmaj7
                 [220.00, 277.18, 329.63, 415.30], // Amaj7
                 [246.94, 293.66, 369.99, 440.00], // Bm7
                 [196.00, 246.94, 293.66, 369.99]  // Gmaj7
             ],
-            speed: 4000, 
+            speed: 4000,
             stepSpeed: 500,
             padOsc: 'sine',
             leadOsc: 'triangle'
         },
-        { 
-            name: "Floating Islands", 
+        {
+            name: "Floating Islands",
             chords: [
                 [207.65, 261.63, 311.13, 392.00], // Abmaj7
                 [233.08, 293.66, 349.23, 440.00], // Bbmaj7
                 [261.63, 329.63, 392.00, 493.88], // Cmaj7
                 [261.63, 329.63, 392.00, 493.88]  // Cmaj7 (held)
             ],
-            speed: 4500, 
+            speed: 4500,
             stepSpeed: 500,
             padOsc: 'triangle',
             leadOsc: 'sine'
         },
-        { 
-            name: "Mystic Journey", 
+        {
+            name: "Mystic Journey",
             chords: [
                 [196.00, 233.08, 293.66, 349.23], // Gm7
                 [174.61, 220.00, 261.63, 329.63], // Fmaj7
                 [155.56, 196.00, 233.08, 293.66], // Ebmaj7
                 [146.83, 185.00, 220.00, 293.66]  // D7
             ],
-            speed: 3600, 
+            speed: 3600,
             stepSpeed: 450,
             padOsc: 'sine',
             leadOsc: 'triangle'
         },
-        { 
-            name: "Gentle Breeze", 
+        {
+            name: "Gentle Breeze",
             chords: [
                 [329.63, 415.30, 493.88, 622.25], // Emaj7
                 [277.18, 349.23, 415.30, 554.37], // Dbmaj7
                 [246.94, 311.13, 369.99, 493.88], // Bmaj7
                 [220.00, 277.18, 329.63, 440.00]  // Amaj7
             ],
-            speed: 3000, 
+            speed: 3000,
             stepSpeed: 300,
             padOsc: 'sine',
             leadOsc: 'sine'
@@ -4332,7 +4404,7 @@ let isInitializingGui = true;
     ];
 
     function createReverb() {
-        const length = audioCtx.sampleRate * (LOW_GFX ? 0.5 : 4); 
+        const length = audioCtx.sampleRate * (LOW_GFX ? 0.5 : 4);
         const impulse = audioCtx.createBuffer(2, length, audioCtx.sampleRate);
         for (let i = 0; i < 2; i++) {
             const channel = impulse.getChannelData(i);
@@ -4349,12 +4421,12 @@ let isInitializingGui = true;
         const osc = audioCtx.createOscillator();
         const env = audioCtx.createGain();
         const filter = audioCtx.createBiquadFilter();
-        
+
         osc.type = oscType;
         osc.frequency.value = freq;
-        
+
         filter.type = 'lowpass';
-        
+
         if (isPad) {
             filter.frequency.value = 600;
             env.gain.setValueAtTime(0, time);
@@ -4367,11 +4439,11 @@ let isInitializingGui = true;
             env.gain.linearRampToValueAtTime(0.1, time + 0.05); // Quick attack
             env.gain.exponentialRampToValueAtTime(0.001, time + duration);
         }
-        
+
         osc.connect(filter);
         filter.connect(env);
         env.connect(musicGain);
-        
+
         osc.start(time);
         osc.stop(time + duration);
     }
@@ -4379,44 +4451,44 @@ let isInitializingGui = true;
     function scheduleNotes() {
         if (!isMusicPlaying || !audioCtx) return;
         const track = tracks[currentTrack];
-        
+
         // Prevent massive scheduling clump if tab was inactive
         if (nextNoteTime < audioCtx.currentTime - 0.5) {
             nextNoteTime = audioCtx.currentTime + 0.1;
         }
-        
+
         while (nextNoteTime < audioCtx.currentTime + 0.2) {
-            
+
             // On chord change
             if (sequenceTime % track.speed === 0) {
                 const chord = track.chords[chordIndex % track.chords.length];
-                
+
                 // Play pad for the chord
                 chord.forEach(freq => {
                     playNote(freq / 2, nextNoteTime, track.speed / 1000 * 1.5, track.padOsc, true);
                 });
             }
-            
+
             const chord = track.chords[chordIndex % track.chords.length];
             const pattern = arpPatterns[chordIndex % arpPatterns.length];
-            
+
             // Music box arpeggio step
             if (sequenceTime % track.stepSpeed === 0) {
                 const arpFreq = chord[pattern[arpIndex % pattern.length]] * 2; // Up one octave
                 playNote(arpFreq, nextNoteTime, track.stepSpeed / 1000 * 2.0, track.leadOsc, false);
                 arpIndex++;
-                
+
                 // Occasional slow melody note
                 if (Math.random() > 0.7) {
                     const melFreq = chord[Math.floor(Math.random() * chord.length)] * 4; // Up two octaves
                     playNote(melFreq, nextNoteTime, track.speed / 1000 * 0.8, track.leadOsc, false);
                 }
             }
-            
+
             // Timing
             nextNoteTime += track.stepSpeed / 1000;
             sequenceTime += track.stepSpeed;
-            
+
             if (sequenceTime >= track.speed) {
                 sequenceTime = 0;
                 chordIndex++;
@@ -4427,9 +4499,9 @@ let isInitializingGui = true;
     }
 
     document.getElementById('music-toggle').addEventListener('click', () => {
-        initAudio(); 
+        initAudio();
         if (audioCtx.state === 'suspended') audioCtx.resume();
-        
+
         if (!musicGain) {
             musicGain = audioCtx.createGain();
             musicGain.gain.value = 0.5;
@@ -4459,7 +4531,7 @@ let isInitializingGui = true;
     document.getElementById('track-toggle').addEventListener('click', () => {
         currentTrack = (currentTrack + 1) % tracks.length;
         document.getElementById('track-toggle').innerText = "Track: " + tracks[currentTrack].name;
-        
+
         sequenceTime = 0;
         chordIndex = 0;
         arpIndex = 0;
@@ -4486,18 +4558,25 @@ let isInitializingGui = true;
     if (typeof gui !== 'undefined') {
         const atmoParams = {
             skyColor: '#' + envConfigs[0].bg.toString(16).padStart(6, '0'),
-            fogColor: '#' + envConfigs[0].fog.toString(16).padStart(6, '0'),
+            skyMid: '#' + envConfigs[0].skyMid.toString(16).padStart(6, '0'),
+            skyHorizon: '#' + envConfigs[0].skyHorizon.toString(16).padStart(6, '0'),
+            horizonGlow: envConfigs[0].horizonGlow,
+            gradientEnabled: true,
+            gradientPower: 1.1,
+            gradientMidOffset: 0.25,
             ambColor: '#' + envConfigs[0].amb.toString(16).padStart(6, '0'),
             dirColor: '#' + envConfigs[0].dir.toString(16).padStart(6, '0'),
             ambI: envConfigs[0].ambI,
             dirI: envConfigs[0].dirI,
             glintCol: '#' + envConfigs[0].glintCol.toString(16).padStart(6, '0')
         };
-        
+
         function updateAtmoParamsFromPhase() {
             const cur = envConfigs[timePhase];
             atmoParams.skyColor = '#' + cur.bg.toString(16).padStart(6, '0');
-            atmoParams.fogColor = '#' + cur.fog.toString(16).padStart(6, '0');
+            atmoParams.skyMid = '#' + cur.skyMid.toString(16).padStart(6, '0');
+            atmoParams.skyHorizon = '#' + cur.skyHorizon.toString(16).padStart(6, '0');
+            atmoParams.horizonGlow = cur.horizonGlow;
             atmoParams.ambColor = '#' + cur.amb.toString(16).padStart(6, '0');
             atmoParams.dirColor = '#' + cur.dir.toString(16).padStart(6, '0');
             atmoParams.ambI = cur.ambI;
@@ -4505,10 +4584,10 @@ let isInitializingGui = true;
             atmoParams.glintCol = '#' + cur.glintCol.toString(16).padStart(6, '0');
             // Refresh GUI display without triggering onChange
             if (atmoFolder) {
-                atmoFolder.controllers.forEach(c => c.updateDisplay());
+                atmoFolder.controllersRecursive().forEach(c => c.updateDisplay());
             }
         }
-        
+
         // Listen to phase changes
         const oldTimeToggle = document.getElementById('time-toggle').onclick;
         document.getElementById('time-toggle').addEventListener('click', () => {
@@ -4516,14 +4595,33 @@ let isInitializingGui = true;
         });
 
         const atmoFolder = gui.addFolder('Atmosphere');
-        atmoFolder.addColor(atmoParams, 'skyColor').name('Sky Color').onChange(v => envConfigs[timePhase].bg = parseInt(v.replace('#',''), 16));
-        atmoFolder.addColor(atmoParams, 'fogColor').name('Fog Color').onChange(v => envConfigs[timePhase].fog = parseInt(v.replace('#',''), 16));
+
+        // Sky & Gradients (same controls as Wanderlust-V). Colours apply to the current time of day.
+        const gradientSkyFolder = atmoFolder.addFolder('Sky & Gradients');
+        const hexOf = (v) => parseInt(v.replace('#', ''), 16);
+        const applySkyPreset = (phase, zenith, mid, horizon, power, midOffset) => {
+            Object.assign(envConfigs[phase], { bg: zenith, skyMid: mid, skyHorizon: horizon });
+            skyUniforms.uGradientPower.value = atmoParams.gradientPower = power;
+            skyUniforms.uGradientMidOffset.value = atmoParams.gradientMidOffset = midOffset;
+            updateAtmoParamsFromPhase();
+        };
+        gradientSkyFolder.add(skyDome, 'visible').name('Gradient Sky Dome');
+        gradientSkyFolder.add(atmoParams, 'gradientEnabled').name('Enable Gradient Curve').onChange(v => skyUniforms.uGradientSkyEnabled.value = v ? 1.0 : 0.0);
+        gradientSkyFolder.addColor(atmoParams, 'skyColor').name('Zenith Color').onChange(v => envConfigs[timePhase].bg = hexOf(v));
+        gradientSkyFolder.addColor(atmoParams, 'skyMid').name('Mid-Sky Color').onChange(v => envConfigs[timePhase].skyMid = hexOf(v));
+        gradientSkyFolder.addColor(atmoParams, 'skyHorizon').name('Horizon Color (+ Fog)').onChange(v => envConfigs[timePhase].skyHorizon = hexOf(v));
+        gradientSkyFolder.add(atmoParams, 'gradientPower', 0.2, 3.0, 0.05).name('Gradient Curve (Power)').onChange(v => skyUniforms.uGradientPower.value = v);
+        gradientSkyFolder.add(atmoParams, 'gradientMidOffset', 0.05, 0.8, 0.01).name('Mid-Height Offset').onChange(v => skyUniforms.uGradientMidOffset.value = v);
+        gradientSkyFolder.add(atmoParams, 'horizonGlow', 0.0, 1.5, 0.05).name('Horizon Band Glow').onChange(v => envConfigs[timePhase].horizonGlow = v);
+        gradientSkyFolder.add({ sunset: () => applySkyPreset(1, 0x2a5090, 0xc85078, 0xffa07a, 1.2, 0.22) }, 'sunset').name('Preset: Sunset Look');
+        gradientSkyFolder.add({ day: () => applySkyPreset(0, 0x4a90d9, 0x7ab4e6, 0xc8dce8, 1.0, 0.25) }, 'day').name('Preset: Day Sky Look');
+
         atmoFolder.addColor(atmoParams, 'ambColor').name('Ambient Light').onChange(v => envConfigs[timePhase].amb = parseInt(v.replace('#',''), 16));
         atmoFolder.addColor(atmoParams, 'dirColor').name('Sun Light').onChange(v => envConfigs[timePhase].dir = parseInt(v.replace('#',''), 16));
         atmoFolder.add(atmoParams, 'ambI', 0, 3).name('Amb Intensity').onChange(v => envConfigs[timePhase].ambI = v);
         atmoFolder.add(atmoParams, 'dirI', 0, 5).name('Sun Intensity').onChange(v => envConfigs[timePhase].dirI = v);
         atmoFolder.addColor(atmoParams, 'glintCol').name('Water Glint').onChange(v => envConfigs[timePhase].glintCol = parseInt(v.replace('#',''), 16));
-        
+
         // 🌙 Dedicated Moonlight & Night Editor
         const moonParams = {
             moonlightColor: '#' + envConfigs[2].dir.toString(16).padStart(6, '0'),
@@ -4531,7 +4629,7 @@ let isInitializingGui = true;
             nightAmbColor: '#' + envConfigs[2].amb.toString(16).padStart(6, '0'),
             nightAmbIntensity: envConfigs[2].ambI,
             nightSkyColor: '#' + envConfigs[2].bg.toString(16).padStart(6, '0'),
-            nightFogColor: '#' + envConfigs[2].fog.toString(16).padStart(6, '0'),
+            nightFogColor: '#' + envConfigs[2].skyHorizon.toString(16).padStart(6, '0'),
             moonAltitude: envConfigs[2].moonY
         };
 
@@ -4542,7 +4640,7 @@ let isInitializingGui = true;
         moonFolder.addColor(moonParams, 'nightAmbColor').name('Night Fill Color').onChange(v => envConfigs[2].amb = parseInt(v.replace('#',''), 16));
         moonFolder.add(moonParams, 'nightAmbIntensity', 0, 5, 0.1).name('Night Fill Power').onChange(v => envConfigs[2].ambI = v);
         moonFolder.addColor(moonParams, 'nightSkyColor').name('Night Sky Color').onChange(v => envConfigs[2].bg = parseInt(v.replace('#',''), 16));
-        moonFolder.addColor(moonParams, 'nightFogColor').name('Night Fog Color').onChange(v => envConfigs[2].fog = parseInt(v.replace('#',''), 16));
+        moonFolder.addColor(moonParams, 'nightFogColor').name('Night Fog + Horizon').onChange(v => envConfigs[2].skyHorizon = parseInt(v.replace('#',''), 16));
         moonFolder.add(moonParams, 'moonAltitude', 200, 4000, 50).name('Moon Altitude').onChange(v => envConfigs[2].moonY = v);
 
         // ✨ Kiki Warm Side Glow Editor
@@ -4570,7 +4668,7 @@ let isInitializingGui = true;
             kikiLeftLight.color.copy(col);
             kikiRightLight.color.copy(col);
         });
-        
+
         // Cloud Editor
         const cloudParams = {
             c0: '#' + pastelColors[0].toString(16).padStart(6, '0'),
@@ -4583,7 +4681,7 @@ let isInitializingGui = true;
             opWispy: matWispyCloud.opacity,
             opMega: megaCloudMat.opacity
         };
-        
+
         let oldCloudColors = [...pastelColors];
         function updateCloudColorForIndex(idx, newHex) {
             const oldHex = oldCloudColors[idx];
@@ -4593,7 +4691,7 @@ let isInitializingGui = true;
             const oldColor = new THREE.Color(oldHex);
             const newColor = new THREE.Color(newHexVal);
             const temp = new THREE.Color();
-            
+
             [instClouds, instHighClouds].forEach(mesh => {
                 for (let i = 0; i < mesh.count; i++) {
                     mesh.getColorAt(i, temp);
@@ -4627,7 +4725,7 @@ let isInitializingGui = true;
             const oldColor = new THREE.Color(oldHex);
             const newColor = new THREE.Color(newHexVal);
             const temp = new THREE.Color();
-            
+
             treeMeshes.forEach(mesh => {
                 const count = mesh.maxCount || mesh.count;
                 for (let i = 0; i < count; i++) {
@@ -4642,7 +4740,7 @@ let isInitializingGui = true;
         }
 
         const treeFolder = gui.addFolder('Tree Editor');
-        treeFolder.add(params, 'treeScale', 0.5, 4.0).name('Tree Scale').onChange(v => {
+        treeFolder.add(params, 'treeScale', 0.5, 8.0).name('Tree Scale').onChange(v => {
             treeUniforms.uTreeScale.value = v;
             if (matTree.userData.shader && matTree.userData.shader.uniforms.uTreeScale) {
                 matTree.userData.shader.uniforms.uTreeScale.value = v;
@@ -4669,7 +4767,7 @@ let isInitializingGui = true;
                 setTimeout(() => sysFolder.title(prevTitle), 1500);
             }
         }, 'saveSettings').name('Save All Settings');
-        
+
         sysFolder.add({
             resetSettings: () => {
                 localStorage.removeItem('flightSettings');
@@ -4685,7 +4783,11 @@ let isInitializingGui = true;
         } catch(e) {
             console.error('Failed to load settings', e);
         }
-        
+
+        // Start with the whole menu minimised: every folder closed, then the Settings panel itself
+        gui.foldersRecursive().forEach(f => f.close());
+        gui.close();
+
         isInitializingGui = false;
     }
 

@@ -142,6 +142,16 @@ export const OCEAN_BIOME = {
     isOcean: true
 };
 
+// World size knobs. Islands are generated in the original design units and then shrunk by
+// WORLD_SCALE; hill shapes inside each biome are sampled HILL_SCALE times tighter.
+export const WORLD_SCALE = 0.3;
+export const HILL_SCALE = 0.65;
+export const HILL_HEIGHT = HILL_SCALE; // shrink height with width so slopes (and mountains) keep their designed steepness
+const INV_WORLD = 1.0 / WORLD_SCALE;
+const INV_HILL = 1.0 / HILL_SCALE;
+const DESIGN_WORLD_BOUNDS = 48000;
+const DESIGN_GRID_SIZE = 6000;
+
 function smoothstep(edge0, edge1, x) {
     const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
     return t * t * (3 - 2 * t);
@@ -152,9 +162,9 @@ function smoothstep(edge0, edge1, x) {
 // ==========================================
 export class WorldLayout {
     constructor(seed = 482731) {
-        this.worldBounds = 48000; // Playable world extent: [-48000, 48000] in X and Z
+        this.worldBounds = DESIGN_WORLD_BOUNDS * WORLD_SCALE; // Playable world extent in X and Z
         this.islands = [];
-        this.gridSize = 6000; // Spatial hash cell size
+        this.gridSize = DESIGN_GRID_SIZE * WORLD_SCALE; // Spatial hash cell size
         this.spatialGrid = new Map();
         this.spawnPosition = new THREE.Vector3(0, 120, 0);
         this.spawnIsland = null;
@@ -167,6 +177,9 @@ export class WorldLayout {
         this.rng = new SeededRandom(seed);
         this.islands = [];
         this.spatialGrid.clear();
+        // Placement below runs in design units; everything is shrunk by WORLD_SCALE afterwards
+        this.worldBounds = DESIGN_WORLD_BOUNDS;
+        this.gridSize = DESIGN_GRID_SIZE;
 
         const placedMajors = [];
         const requiredBiomes = [...BIOME_CATALOG];
@@ -364,7 +377,18 @@ export class WorldLayout {
             }
         }
 
-        // 3. Build 2D Spatial Hash Grid for Ultra-Fast O(1) Vertex Queries
+        // 3. Shrink the layout to world units
+        for (const isl of this.islands) {
+            isl.centerX *= WORLD_SCALE;
+            isl.centerZ *= WORLD_SCALE;
+            isl.radiusX *= WORLD_SCALE;
+            isl.radiusZ *= WORLD_SCALE;
+            isl.maxRadius *= WORLD_SCALE;
+        }
+        this.worldBounds = DESIGN_WORLD_BOUNDS * WORLD_SCALE;
+        this.gridSize = DESIGN_GRID_SIZE * WORLD_SCALE;
+
+        // 4. Build 2D Spatial Hash Grid for Ultra-Fast O(1) Vertex Queries
         this._buildSpatialGrid();
 
         // 4. Determine Safe Spawn Location on Archipelago or Ghibli Land
@@ -377,7 +401,7 @@ export class WorldLayout {
         this.spatialGrid.clear();
         for (const island of this.islands) {
             // Generous bounding box covering island influence (including smooth coastline falloff)
-            const margin = island.maxRadius * 1.6 + 600;
+            const margin = island.maxRadius * 1.6 + 600 * WORLD_SCALE;
             const minX = Math.floor((island.centerX - margin) / this.gridSize);
             const maxX = Math.floor((island.centerX + margin) / this.gridSize);
             const minZ = Math.floor((island.centerZ - margin) / this.gridSize);
@@ -422,9 +446,10 @@ export class WorldLayout {
 
         // Multi-frequency noise domain warping for organic coastlines, bays, and coves
         const seedOff = island.noiseSeed;
-        const warp1 = snoise(worldX * 0.00045 + seedOff, worldZ * 0.00045 + seedOff) * 0.22;
-        const warp2 = snoise(worldX * 0.0012 - seedOff, worldZ * 0.0012 + seedOff) * 0.10;
-        const coastNoise = snoise(worldX * 0.0035 + seedOff * 2, worldZ * 0.0035 - seedOff * 2) * 0.05;
+        const dX = worldX * INV_WORLD, dZ = worldZ * INV_WORLD;
+        const warp1 = snoise(dX * 0.00045 + seedOff, dZ * 0.00045 + seedOff) * 0.22;
+        const warp2 = snoise(dX * 0.0012 - seedOff, dZ * 0.0012 + seedOff) * 0.10;
+        const coastNoise = snoise(dX * 0.0035 + seedOff * 2, dZ * 0.0035 - seedOff * 2) * 0.05;
 
         const effectiveDist = normDist + warp1 + warp2 + coastNoise;
 
@@ -473,7 +498,7 @@ export class WorldLayout {
         let maxIslandMask = 0;
 
         // Base ocean floor with gentle deep submarine relief
-        const oceanRelief = snoise(worldX * 0.0006, worldZ * 0.0006) * 3.5 - 6.0;
+        const oceanRelief = snoise(worldX * INV_WORLD * 0.0006, worldZ * INV_WORLD * 0.0006) * 3.5 - 6.0;
 
         for (let i = 0; i < candidates.length; i++) {
             const isl = candidates[i];
@@ -482,7 +507,7 @@ export class WorldLayout {
                 // Pass island-centered local coordinates to get natural mountain massifs and valleys
                 const lx = worldX - isl.centerX;
                 const lz = worldZ - isl.centerZ;
-                const rawH = isl.biome.module.getHeight(lx, lz, snoise);
+                const rawH = isl.biome.module.getHeight(lx * INV_HILL, lz * INV_HILL, snoise) * HILL_HEIGHT;
 
                 // Natural island elevation profile:
                 // Shoreline meets water smoothly at y = 2.8m above sea level (y = 0)
@@ -503,7 +528,48 @@ export class WorldLayout {
             return oceanRelief; // Open ocean base depth
         }
 
-        return maxElevation;
+        return this.applyLandforms(maxElevation, worldX, worldZ, maxIslandMask, snoise);
+    }
+
+    /**
+     * Shared landforms on top of every biome: ridges, cliff bands, rivers and ponds.
+     * Water sits at y = 2.4, so rivers and ponds just carve the ground below it.
+     */
+    applyLandforms(h, x, z, landMask, snoise) {
+        const inland = smoothstep(0.12, 0.5, landMask);
+        if (inland <= 0) return h;
+
+        // Rounded ridgelines on higher ground (squared noise keeps the crest soft, not a knife edge)
+        const rq = snoise(x * 0.0026 + 311.0, z * 0.0026 - 127.0);
+        const rn = 1.0 - rq * rq;
+        h += rn * rn * 12.0 * inland * smoothstep(8.0, 30.0, h) * (1.0 - smoothstep(45.0, 80.0, h));
+
+        // Cliff bands: terrace the height into steep steps inside patches
+        const cliffZone = smoothstep(0.2, 0.55, snoise(x * 0.0011 - 900.0, z * 0.0011 + 400.0)) * inland * 0.4;
+        // Only on foothills: terracing tall mountain slopes turns them into staircase walls
+        const cliffFade = 1.0 - smoothstep(28.0, 45.0, h);
+        if (cliffZone > 0 && h > 7.0 && cliffFade > 0) {
+            const stepH = 9.0;
+            const t = (h - 7.0) / stepH;
+            const fl = Math.floor(t);
+            const terraced = 7.0 + (fl + smoothstep(0.05, 0.95, t - fl)) * stepH;
+            h += (terraced - h) * cliffZone * cliffFade;
+        }
+
+        // Winding rivers (fade out before they would cut through tall mountains)
+        const wx = x + snoise(x * 0.0021 + 77.0, z * 0.0021 - 33.0) * 70.0;
+        const wz = z + snoise(x * 0.0021 - 51.0, z * 0.0021 + 19.0) * 70.0;
+        const rv = Math.abs(snoise(wx * 0.0009 + 500.0, wz * 0.0009 + 500.0));
+        // wide soft banks; rivers only run through lower ground so they never cut steep gorges
+        const river = (1.0 - smoothstep(0.015, 0.22, rv)) * inland * (1.0 - smoothstep(10.0, 24.0, h));
+
+        // Ponds in low ground
+        const pn = snoise(x * 0.0042 + 1300.0, z * 0.0042 - 700.0);
+        const pond = smoothstep(0.45, 0.85, pn) * inland * (1.0 - smoothstep(9.0, 20.0, h));
+
+        const carve = Math.max(river, pond);
+        if (carve > 0) h = Math.min(h, h + (0.6 - h) * carve); // only ever lowers ground, so no step at the shoreline
+        return h;
     }
 
     /**
@@ -537,11 +603,11 @@ export class WorldLayout {
                 const w1 = maxMask / totalW;
                 const w2 = secondMask / totalW;
 
-                bestIsl.biome.module.getColor(h, worldX, worldZ, snoise, blendColor1, smoothstep);
-                secondIsl.biome.module.getColor(h, worldX, worldZ, snoise, blendColor2, smoothstep);
+                bestIsl.biome.module.getColor(h, worldX * INV_HILL, worldZ * INV_HILL, snoise, blendColor1, smoothstep);
+                secondIsl.biome.module.getColor(h, worldX * INV_HILL, worldZ * INV_HILL, snoise, blendColor2, smoothstep);
                 targetColor.copy(blendColor1).lerp(blendColor2, w2);
             } else {
-                bestIsl.biome.module.getColor(h, worldX, worldZ, snoise, targetColor, smoothstep);
+                bestIsl.biome.module.getColor(h, worldX * INV_HILL, worldZ * INV_HILL, snoise, targetColor, smoothstep);
             }
         } else {
             // Open Ocean shallow-to-deep vertex coloring

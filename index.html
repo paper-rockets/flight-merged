@@ -110,10 +110,80 @@
     @media (hover: hover) and (pointer: fine) {
       #touch-controls { display: none; }
     }
+
+    /* ── Wanderlust-II top-bar ──────────────────────────────────────────── */
+    #top-bar {
+      position: fixed; top: 14px; left: 16px; right: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 10; pointer-events: none;
+      gap: 10px;
+    }
+    #top-bar > * { pointer-events: auto; }
+    .top-bar-left {
+      display: flex; align-items: center; gap: 10px; pointer-events: none; flex-shrink: 0;
+    }
+    .top-bar-left > * { pointer-events: auto; }
+    .top-bar-right {
+      display: flex; align-items: center; gap: 10px; pointer-events: none;
+    }
+    .top-bar-right > * { pointer-events: auto; }
+    .top-action-buttons {
+      display: flex; align-items: center; gap: 6px; pointer-events: auto;
+    }
+    #fps-counter {
+      color: rgba(255,255,255,0.95); font-family: -apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      font-size: 15px; font-weight: 600; letter-spacing: 0.5px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.35); user-select: none;
+      pointer-events: none; white-space: nowrap;
+    }
+    #biome-label {
+      color: rgba(255,255,255,0.85); font-family: -apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      font-size: 12px; font-weight: 600; letter-spacing: 0.4px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.4); user-select: none;
+      pointer-events: none; white-space: nowrap;
+    }
+    #top-model-select {
+      background: rgba(15,20,28,0.94); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px; padding: 4px 10px; color: rgba(255,255,255,0.95);
+      font-family: -apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      font-size: 12px; font-weight: 600; box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+      cursor: pointer; outline: none; transition: all 0.2s ease; max-width: 120px;
+    }
+    #top-model-select:hover {
+      background: rgba(30,41,59,0.95); border-color: rgba(56,189,248,0.5); color: #38bdf8;
+    }
+    #top-model-select option { background: #0f141c; color: #fff; font-size: 12px; }
+    #top-bar button {
+      background: none; border: none; color: rgba(255,255,255,0.95); cursor: pointer;
+      font-size: 19px; padding: 4px; line-height: 1;
+      display: inline-flex; align-items: center; justify-content: center;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.35); transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+      user-select: none; outline: none; -webkit-tap-highlight-color: transparent;
+    }
+    #top-bar button:hover { opacity: 1; transform: scale(1.08); }
+    #top-bar button:active { transform: scale(0.88); opacity: 0.7; }
+    .lil-gui.root {
+      position: fixed !important; top: 58px !important; right: 20px !important; left: auto !important;
+      max-width: min(340px, 92vw) !important; max-height: calc(100vh - 78px) !important; overflow-y: auto !important;
+      border-radius: 12px !important; background: rgba(15,20,28,0.96) !important;
+      border: 1px solid rgba(255,255,255,0.15) !important; box-shadow: 0 16px 40px rgba(0,0,0,0.6) !important;
+      z-index: 95 !important; font-family: -apple-system, BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif !important;
+    }
+    /* Mobile */
+    @media (max-width: 768px), (orientation: portrait) {
+      #top-bar { left:10px; right:10px; top:10px; flex-direction:column; align-items:stretch; gap:6px; }
+      .top-bar-left { width:100%; display:flex; justify-content:space-between; align-items:center; }
+      .top-bar-right { width:100%; display:flex; justify-content:space-between; align-items:center; }
+      .top-action-buttons { gap:4px; }
+      #fps-counter { font-size:12px !important; }
+      #biome-label { font-size:10px !important; max-width:100px; overflow:hidden; text-overflow:ellipsis; }
+      #top-model-select { font-size:10px !important; padding:3px 4px !important; max-width:90px; }
+      #top-bar button { padding:2px !important; }
+    }
   </style>
 </head>
 <body>
-<div id="debug-overlay" style="position: absolute; z-index: 9999; background: red; color: white; font-size: 24px; padding: 20px; display: none;"></div>
+<div id="debug-overlay" style="position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999; background: #b91c1c; color: #ffffff; padding: 16px 24px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); max-width: 90%; display: none;"></div>
 <script>
 function showError(msg) {
     var overlay = document.getElementById('debug-overlay');
@@ -135,12 +205,37 @@ console.error = function(...args) {
   <div id="app"></div>
 
 
-  <div id="top-bar" style="position: fixed; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; z-index: 10; background: rgba(0,0,0,0.5); padding: 6px 12px; border-radius: 6px;">
-    <button id="pause-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">⏸</button>
-    <div id="fps-counter" style="color: #fff; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none;">0 FPS</div>
-    <div id="biome-label" style="color: #ffe066; font-family: monospace; font-size: 13px; font-weight: bold; pointer-events: none; opacity: 0.9;"></div>
-    <button id="time-toggle" style="background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 0;">☀️</button>
-    <button id="gui-toggle-btn" style="background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; cursor: pointer; font-size: 12px; font-weight: bold; padding: 3px 8px; border-radius: 4px; margin-left: 6px;">⚙️ Settings (H)</button>
+  <div id="top-bar">
+    <div class="top-bar-left">
+      <div id="fps-counter">0 FPS</div>
+      <div id="biome-label"></div>
+    </div>
+    <div class="top-bar-right">
+      <select id="top-model-select" title="Flight Model" aria-label="Flight Model">
+        <option value="0">Kiki</option>
+        <option value="1">Whale</option>
+        <option value="2">Savoia</option>
+        <option value="3">B2M2</option>
+        <option value="4">Sopwith</option>
+        <option value="5">Sikorsky</option>
+        <option value="6">Robin</option>
+        <option value="7">Pewee</option>
+        <option value="8">Bittern</option>
+        <option value="9">Macaw</option>
+        <option value="10">Flock</option>
+        <option value="11">Morpho</option>
+        <option value="12">Monarch</option>
+        <option value="13">Charizard</option>
+      </select>
+      <div class="top-action-buttons">
+        <button id="top-music-btn" title="Toggle Music" aria-label="Toggle Music" style="opacity:0.65;transition:all 0.2s ease"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button>
+        <button id="top-engine-btn" title="Toggle Engine Sound" aria-label="Toggle Engine Sound" style="display:none;opacity:1;color:#4ade80;transition:all 0.2s ease"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 9V3c2.5 0 3.5 2 3.5 3.5S14.5 9 12 9z"/><path d="M12 15v6c-2.5 0-3.5-2-3.5-3.5S10.5 15 12 15z"/><path d="M9 12H3c0-2.5 2-3.5 3.5-3.5S9 9.5 9 12z"/><path d="M15 12h6c0 2.5-2 3.5-3.5 3.5S15 14.5 15 12z"/></svg></button>
+        <button id="pause-toggle" title="Pause / Resume Flight" aria-label="Pause / Resume"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg></button>
+        <button id="time-toggle" title="Cycle Time of Day" aria-label="Cycle Time of Day"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/><line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/><line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/></svg></button>
+        <button id="fullscreen-toggle" title="Toggle Fullscreen" aria-label="Toggle Fullscreen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg></button>
+        <button id="gui-toggle-btn" title="Settings (H)" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      </div>
+    </div>
   </div>
 
   <!-- Mini-map: small paper map in the corner; click (or M) opens the big map, click a spot there to fly -->
@@ -239,17 +334,15 @@ import terrainGhibli from './terrain-ghibli.js';
 import terrainMtn from './terrain-mountains.js';
 import terrainCrystal from './terrain-crystal.js';
 import terrainMtn2 from './terrain-mountains2.js';
-import { WorldLayout, BIOME_CATALOG, OCEAN_BIOME } from './world-layout.js';
+import { WorldLayout, BIOME_CATALOG } from './world-layout.js';
 
     import * as THREE from 'three';
     import { initTerrainEditor } from './TerrainEditor.js';
     import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-    import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
     import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
     import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
     import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -774,7 +867,7 @@ let isInitializingGui = true;
             const crystalEditor = document.getElementById('crystal-editor');
             if (crystalEditor) crystalEditor.style.display = crystalEditor.style.display === 'none' ? 'block' : 'none';
         },
-        toggleMusic: () => document.getElementById('music-toggle').click(),
+        toggleMusic: () => document.getElementById('top-music-btn').click(),
         nextTrack: () => document.getElementById('track-toggle').click(),
         fullscreen: () => document.getElementById('fullscreen-toggle').click()
     };
@@ -951,10 +1044,41 @@ let isInitializingGui = true;
 
     document.getElementById('pause-toggle').addEventListener('click', () => {
         isFlightPaused = !isFlightPaused;
-        document.getElementById('pause-toggle').innerText = isFlightPaused ? '▶' : '⏸';
+        const pBtn = document.getElementById('pause-toggle');
+        pBtn.innerHTML = isFlightPaused
+            ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>'
+            : '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="4" width="4" height="16" rx="1"/><rect x="15" y="4" width="4" height="16" rx="1"/></svg>';
     });
 
+    // Model dropdown — syncs with FlightModelManager
+    document.getElementById('top-model-select').addEventListener('change', (e) => {
+        _fmLoadAndActivate(parseInt(e.target.value));
+    });
+    // Keep dropdown in sync when prev/next buttons are used
+    window.addEventListener('flight-model-changed', (e) => {
+        const sel = document.getElementById('top-model-select');
+        if (sel) sel.value = String(e.detail.index);
+        const engineBtn = document.getElementById('top-engine-btn');
+        const isPlane = !!e.detail.config.isPlane;
+        if (engineBtn) engineBtn.style.display = isPlane ? 'inline-flex' : 'none';
+        if (biplaneEngine) biplaneEngine.setActive(isPlane);
+    });
 
+    // Fullscreen toggle
+    document.getElementById('fullscreen-toggle').addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(err => console.warn(`Fullscreen error: ${err.message}`));
+        } else {
+            document.exitFullscreen().catch(() => {});
+        }
+    });
+
+    // Wind toggle — enables trailing stream lines and gentle turbulence
+    document.getElementById('wind-toggle').addEventListener('click', () => {
+        isWindOn = !isWindOn;
+        document.getElementById('wind-toggle').innerText = `Wind: ${isWindOn ? 'ON' : 'OFF'}`;
+        if (typeof params !== 'undefined') params.wind = isWindOn;
+    });
 
     const clickRaycaster = new THREE.Raycaster();
     const clickMouse = new THREE.Vector2();
@@ -1172,11 +1296,13 @@ let isInitializingGui = true;
     function _fmActivate(index) {
         if (fmCurrentWrapper) fmCurrentWrapper.visible = false;
         fmCurrentIndex = index;
-        const { wrapper, mixer } = fmCache.get(FLIGHT_MODELS[index].id);
+        const cfg = FLIGHT_MODELS[index];
+        const { wrapper, mixer } = fmCache.get(cfg.id);
         fmCurrentWrapper = wrapper;
         fmCurrentMixer = mixer;
         fmCurrentWrapper.visible = isModelVisible;
         _fmNameBtn(document.getElementById('char-name'));
+        window.dispatchEvent(new CustomEvent('flight-model-changed', { detail: { index, config: cfg } }));
     }
 
     function fmNext() {
@@ -1621,7 +1747,7 @@ let isInitializingGui = true;
         }
     }
 
-    loadAssets();
+
 
     // ==========================================
     // 3D ANIMATED CAPYBARA ENTITY SYSTEM (GLTF)
@@ -2222,160 +2348,6 @@ let isInitializingGui = true;
     t4Geos.push(t4Crown);
     const geoTree4 = BufferGeometryUtils.mergeGeometries(t4Geos.map(g => g.index ? g.toNonIndexed() : g), false);
 
-    // Tree 5: Fluffy Rounded Bonsai / Ancient Oak (No cut-off tops!)
-    const t5Geos = [];
-    const t5Trunk = new THREE.CylinderGeometry(0.6, 1.2, 3.5, 6);
-    t5Trunk.translate(0, 1.75, 0);
-    applyColor(t5Trunk, 0x7a6f5e);
-    t5Geos.push(t5Trunk);
-
-    const leavesPos = [
-        {x: 0, y: 5.5, z: 0, s: 1.3, col: 0x88c94e},
-        {x: 2.1, y: 4.2, z: 0, s: 1.1, col: 0x6bb846},
-        {x: -1.9, y: 3.8, z: 0.6, s: 1.0, col: 0x5ea83b},
-        {x: 1.0, y: 4.6, z: -1.3, s: 0.95, col: 0x78bd44}
-    ];
-    leavesPos.forEach(pos => {
-        const leaf = new THREE.DodecahedronGeometry(1.8 * pos.s, 1);
-        leaf.scale(1.0, 0.78, 1.0); // Natural rounded canopy cloud
-        leaf.translate(pos.x, pos.y, pos.z);
-        applyColor(leaf, pos.col);
-        t5Geos.push(leaf);
-    });
-    const geoTree5 = BufferGeometryUtils.mergeGeometries(t5Geos.map(g => g.index ? g.toNonIndexed() : g), false);
-
-    // Tree 6: Pink Cherry Blossom & Autumn Amber Mix
-    const t6Geos = [];
-    const t6Trunk = new THREE.CylinderGeometry(0.3, 0.6, 3, 3);
-    t6Trunk.translate(0, 1.5, 0);
-    applyColor(t6Trunk, 0xa87f5e);
-    t6Geos.push(t6Trunk);
-
-    const blossomPos = [
-        {x: 0, y: 4.8, z: 0, s: 1.6, col: 0xffa6c9},
-        {x: -1.2, y: 3.8, z: 0.8, s: 1.3, col: 0xffb5d2},
-        {x: 1.2, y: 4.1, z: -0.6, s: 1.4, col: 0xf5a15b} // Subtle autumn amber touch
-    ];
-    blossomPos.forEach(pos => {
-        const leaf = new THREE.DodecahedronGeometry(1.5 * pos.s, 1);
-        leaf.scale(1, 0.8, 1);
-        leaf.translate(pos.x, pos.y, pos.z);
-        applyColor(leaf, pos.col);
-        t6Geos.push(leaf);
-    });
-    const geoTree6 = BufferGeometryUtils.mergeGeometries(t6Geos.map(g => g.index ? g.toNonIndexed() : g), false);
-
-
-    const wallColors = [0xfef0c8, 0xebaf9b, 0x82bfa8, 0x6e9ca8, 0xe1d9c1, 0xffffff, 0xcbe3d6];
-    const roofColors = [0xd95a53, 0x4a7c8c, 0x5a6351, 0x8a7b6b, 0x8a4538, 0x566d8f];
-    const woodColor = 0x5c4033;
-    const windowColor = 0x223344;
-
-    const matWalls = wallColors.map(c => new THREE.MeshToonMaterial({ color: c, gradientMap: gradientMap }));
-    const matRoofs = roofColors.map(c => new THREE.MeshToonMaterial({ color: c, gradientMap: gradientMap }));
-    const matWoodDark = new THREE.MeshToonMaterial({ color: woodColor, gradientMap: gradientMap });
-    const matWindowDark = new THREE.MeshToonMaterial({ color: windowColor, gradientMap: gradientMap });
-    const matBushDark = new THREE.MeshToonMaterial({ color: 0x3a6b4a, gradientMap: gradientMap });
-    const matStone = new THREE.MeshToonMaterial({ color: 0x9e9e9e, gradientMap: gradientMap });
-    const matMetal = new THREE.MeshToonMaterial({ color: 0x5a5a6a, gradientMap: gradientMap });
-    const matShutter = new THREE.MeshToonMaterial({ color: 0x418a7a, gradientMap: gradientMap });
-
-    const matClothes = [
-        new THREE.MeshToonMaterial({ color: 0xdd4444, gradientMap: gradientMap }),
-        new THREE.MeshToonMaterial({ color: 0x4488dd, gradientMap: gradientMap }),
-        new THREE.MeshToonMaterial({ color: 0xdddd44, gradientMap: gradientMap }),
-        new THREE.MeshToonMaterial({ color: 0xeeeeee, gradientMap: gradientMap })
-    ];
-
-    function createAntenna() {
-        const grp = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3), matMetal);
-        pole.position.y = 1.5;
-        grp.add(pole);
-        const cross = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2), matMetal);
-        cross.rotation.z = Math.PI/2;
-        cross.position.y = 2.5;
-        grp.add(cross);
-        const cross2 = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.5), matMetal);
-        cross2.rotation.z = Math.PI/2;
-        cross2.position.y = 2.0;
-        grp.add(cross2);
-        return grp;
-    }
-
-    function createBalcony(w, d, matBase, matRail) {
-        const balc = new THREE.Group();
-        const baseGeo = new THREE.BoxGeometry(w, 0.4, d);
-        const base = new THREE.Mesh(baseGeo, matBase);
-        base.castShadow = true;
-        balc.add(base);
-
-        const railGeo = new THREE.BoxGeometry(0.2, 1.2, d);
-        const railL = new THREE.Mesh(railGeo, matRail);
-        railL.position.set(-w/2 + 0.1, 0.6, 0);
-        railL.castShadow = true;
-        balc.add(railL);
-
-        const railR = new THREE.Mesh(railGeo, matRail);
-        railR.position.set(w/2 - 0.1, 0.6, 0);
-        railR.castShadow = true;
-        balc.add(railR);
-
-        const railFGeo = new THREE.BoxGeometry(w, 1.2, 0.2);
-        const railF = new THREE.Mesh(railFGeo, matRail);
-        railF.position.set(0, 0.6, d/2 - 0.1);
-        railF.castShadow = true;
-        balc.add(railF);
-        return balc;
-    }
-
-    function createWindow(w, h) {
-        const winGeo = new THREE.BoxGeometry(w, h, 0.2);
-        const win = new THREE.Mesh(winGeo, matWindowDark);
-
-        const frameGeoL = new THREE.BoxGeometry(0.3, h + 0.6, 0.4);
-        const frameL = new THREE.Mesh(frameGeoL, matWoodDark);
-        frameL.position.set(-w/2 - 0.15, 0, 0);
-        win.add(frameL);
-        const frameR = new THREE.Mesh(frameGeoL, matWoodDark);
-        frameR.position.set(w/2 + 0.15, 0, 0);
-        win.add(frameR);
-        const frameTGeo = new THREE.BoxGeometry(w + 0.9, 0.3, 0.4);
-        const frameT = new THREE.Mesh(frameTGeo, matWoodDark);
-        frameT.position.set(0, h/2 + 0.15, 0);
-        win.add(frameT);
-        const frameB = new THREE.Mesh(frameTGeo, matWoodDark);
-        frameB.position.set(0, -h/2 - 0.15, 0);
-        win.add(frameB);
-        return win;
-    }
-
-    function createWindowWithShutters(w, h, sMat) {
-        const win = createWindow(w, h);
-        if (Math.random() > 0.3) {
-            const shutterGeo = new THREE.BoxGeometry(w/2 * 0.9, h, 0.15);
-            const shutterL = new THREE.Mesh(shutterGeo, sMat);
-            shutterL.position.set(-w/2 - w/4, 0, 0.1);
-            win.add(shutterL);
-            const shutterR = new THREE.Mesh(shutterGeo, sMat);
-            shutterR.position.set(w/2 + w/4, 0, 0.1);
-            win.add(shutterR);
-        }
-        if (Math.random() > 0.5) {
-            const planterGeo = new THREE.BoxGeometry(w + 0.4, 0.4, 0.6);
-            const planter = new THREE.Mesh(planterGeo, matWoodDark);
-            planter.position.set(0, -h/2 - 0.2, 0.3);
-            win.add(planter);
-            const bushGeo = new THREE.DodecahedronGeometry(0.3, 0);
-            for(let i=0; i<3; i++) {
-                const b = new THREE.Mesh(bushGeo, matBushDark);
-                b.position.set(-w/2 + i*(w/2), -h/2 + 0.1, 0.4);
-                win.add(b);
-            }
-        }
-        return win;
-    }
-
     // Other Geometries
     const geoRock = new THREE.DodecahedronGeometry(2.5, 0); // 36-triangle low poly boulders
 
@@ -2386,10 +2358,6 @@ let isInitializingGui = true;
     geoFlowerHead.translate(0, 0.5, 0);
     geoFlowerHead.scale(1, 0.5, 1);
     const geoFlower = BufferGeometryUtils.mergeGeometries([geoFlowerStem.toNonIndexed(), geoFlowerHead.toNonIndexed()]);
-
-    const b3 = new THREE.ConeGeometry(0.15, 0.6, 3);
-    b3.translate(0, 0.3, 0);
-    b3.rotateX(-0.2);
 
     // Was a squashed 20-sided ball, which read as a flat paper cut-out from underneath.
     const geoCloud = buildLowCloud();
@@ -2489,9 +2457,6 @@ let isInitializingGui = true;
     // Water Mesh
     let waterMesh;
 
-    function loadAssets() {
-        // All 3D models removed
-    }
 
     const waterGeo = new THREE.PlaneGeometry(5000, 5000);
     waterGeo.rotateX(-Math.PI / 2);
@@ -3419,6 +3384,33 @@ let isInitializingGui = true;
        trailsData[i*4+2] = (Math.random() - 0.5) * 100;
        trailsData[i*4+3] = Math.random();
     }
+
+    // ==========================================
+    // RAIN SYSTEM
+    // ==========================================
+    const RAIN_COUNT = 2500;
+    const rainGeoAttr = new THREE.BufferGeometry();
+    const rainPositions = new Float32Array(RAIN_COUNT * 3);
+    const rainVelocities = new Float32Array(RAIN_COUNT); // per-drop fall speed variance
+    for (let i = 0; i < RAIN_COUNT; i++) {
+        rainPositions[i * 3 + 0] = (Math.random() - 0.5) * 320;
+        rainPositions[i * 3 + 1] = (Math.random()) * 200 - 20;
+        rainPositions[i * 3 + 2] = (Math.random() - 0.5) * 320;
+        rainVelocities[i] = 70 + Math.random() * 50; // 70–120 units/s
+    }
+    rainGeoAttr.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+    const rainMat = new THREE.PointsMaterial({
+        color: 0xaaccff,
+        size: 1.2,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+        sizeAttenuation: true
+    });
+    const rainSystem = new THREE.Points(rainGeoAttr, rainMat);
+    rainSystem.visible = false;
+    rainSystem.frustumCulled = false;
+    scene.add(rainSystem);
 
     function updateBirdsGen(data, inst, count, tX, tY, tZ, time, dt, centerPull) {
         for (let i = 0; i < count; i++) {
@@ -4403,6 +4395,11 @@ let isInitializingGui = true;
 
         // Banking
         let targetRoll = (turnVelocity / maxTurnSpeed) * maxBankAngle;
+        // Wind turbulence: gentle sinusoidal roll sway when wind is on
+        if (isWindOn) {
+            const t = performance.now() * 0.001;
+            targetRoll += Math.sin(t * 0.7) * 0.045 + Math.sin(t * 1.3 + 1.2) * 0.025;
+        }
         currentRoll = THREE.MathUtils.lerp(currentRoll, targetRoll, 1.5 * delta);
 
         // Altitude Control
@@ -4849,6 +4846,24 @@ let isInitializingGui = true;
             dirLight.shadow.camera.updateProjectionMatrix();
         }
 
+        // Rain update — follow player, drop each point downward, wrap when below
+        if (isRainOn) {
+            rainSystem.visible = true;
+            rainSystem.position.copy(playerGrp.position);
+            const rp = rainGeoAttr.attributes.position.array;
+            for (let i = 0; i < RAIN_COUNT; i++) {
+                rp[i * 3 + 1] -= rainVelocities[i] * dt;
+                if (rp[i * 3 + 1] < -120) {
+                    rp[i * 3 + 0] = (Math.random() - 0.5) * 320;
+                    rp[i * 3 + 1] = 180 + Math.random() * 40;
+                    rp[i * 3 + 2] = (Math.random() - 0.5) * 320;
+                }
+            }
+            rainGeoAttr.attributes.position.needsUpdate = true;
+        } else {
+            rainSystem.visible = false;
+        }
+
         updateInstances(playerGrp.position.x, playerGrp.position.z, time, dt, currentYaw);
         if (currentFrame % 4 === 0) updateTreeLOD(playerGrp.position.x, playerGrp.position.z);
         updateBirds(playerGrp.position.x, playerGrp.position.y, playerGrp.position.z, time, dt);
@@ -4897,6 +4912,9 @@ let isInitializingGui = true;
                 const targetFreq = 400 + Math.sin(time) * 100 + speedFactor * 800;
                 windFilter.frequency.setTargetAtTime(targetFreq, audioCtx.currentTime, 0.1);
             }
+        }
+        if (biplaneEngine) {
+            biplaneEngine.update(dt, isBoosting, isBraking, isFlightPaused, velocity, camera.position.length());
         }
 
         // Update God Rays sun screen position
@@ -4954,10 +4972,133 @@ let isInitializingGui = true;
 
 
     // ==========================================
-    // 9. AUDIO (WIND SOUNDSCAPE)
+    // 9. AUDIO
     // ==========================================
+
+    class BiplaneEngineAudio {
+        constructor(audioCtx = null, outputNode = null) {
+            this.audioCtx = audioCtx;
+            this.outputNode = outputNode || (audioCtx ? audioCtx.destination : null);
+            this.noiseBuffer = null;
+            this.masterGain = null; this.cylinderGain = null; this.noiseGain = null; this.subGain = null;
+            this.cylinderFilter = null; this.noiseFilter = null;
+            this.osc1 = null; this.osc2 = null; this.subOsc = null;
+            this.lfoOsc = null; this.lfoGain = null; this.noiseSource = null;
+            this.isRunning = false; this.isActive = false; this.isEnabled = true; this.isMuted = false;
+            this.targetFade = 0.0; this.currentFade = 0.0; this.currentRpm = 0.35;
+            this.volume = 0.038; this.clock = 0;
+            if (this.audioCtx) this._setupNodes();
+        }
+        setAudioContext(audioCtx, outputNode = null) {
+            if (this.audioCtx === audioCtx && this.masterGain) return;
+            this.destroy(); this.audioCtx = audioCtx;
+            this.outputNode = outputNode || (audioCtx ? audioCtx.destination : null);
+            this.noiseBuffer = null;
+            if (this.audioCtx) { this._setupNodes(); if (this.isActive && this.isEnabled && !this.isMuted) { this.targetFade = 1.0; this._startNodes(); } }
+        }
+        _createNoiseBuffer() {
+            if (!this.audioCtx || this.noiseBuffer) return;
+            const sr = this.audioCtx.sampleRate, sz = sr * 1.5;
+            this.noiseBuffer = this.audioCtx.createBuffer(1, sz, sr);
+            const d = this.noiseBuffer.getChannelData(0);
+            for (let i = 0; i < sz; i++) d[i] = Math.random() * 2 - 1;
+        }
+        _setupNodes() {
+            if (!this.audioCtx) return;
+            if (!this.outputNode) this.outputNode = this.audioCtx.destination;
+            this._createNoiseBuffer();
+            this.masterGain = this.audioCtx.createGain(); this.masterGain.gain.setValueAtTime(0, this.audioCtx.currentTime); this.masterGain.connect(this.outputNode);
+            this.cylinderFilter = this.audioCtx.createBiquadFilter(); this.cylinderFilter.type = 'lowpass'; this.cylinderFilter.frequency.setValueAtTime(200, this.audioCtx.currentTime); this.cylinderFilter.Q.setValueAtTime(1.8, this.audioCtx.currentTime);
+            this.cylinderGain = this.audioCtx.createGain(); this.cylinderGain.gain.setValueAtTime(0.65, this.audioCtx.currentTime);
+            this.noiseFilter = this.audioCtx.createBiquadFilter(); this.noiseFilter.type = 'bandpass'; this.noiseFilter.frequency.setValueAtTime(240, this.audioCtx.currentTime); this.noiseFilter.Q.setValueAtTime(1.2, this.audioCtx.currentTime);
+            this.noiseGain = this.audioCtx.createGain(); this.noiseGain.gain.setValueAtTime(0.18, this.audioCtx.currentTime);
+            this.subGain = this.audioCtx.createGain(); this.subGain.gain.setValueAtTime(0.35, this.audioCtx.currentTime);
+            this.cylinderFilter.connect(this.cylinderGain); this.cylinderGain.connect(this.masterGain);
+            this.noiseFilter.connect(this.noiseGain); this.noiseGain.connect(this.masterGain);
+            this.subGain.connect(this.masterGain);
+        }
+        setEnabled(v) { this.isEnabled = !!v; this._updateTargetFade(); }
+        setMuted(v)   { this.isMuted   = !!v; this._updateTargetFade(); }
+        setActive(v)  { this.isActive  = !!v; this._updateTargetFade(); }
+        _updateTargetFade() {
+            const s = this.isActive && this.isEnabled && !this.isMuted;
+            this.targetFade = s ? 1.0 : 0.0;
+            if (s && !this.isRunning && this.audioCtx) this._startNodes();
+        }
+        _startNodes() {
+            if (this.isRunning || !this.audioCtx) return;
+            if (this.audioCtx.state === 'suspended') this.audioCtx.resume().catch(() => {});
+            if (!this.masterGain) this._setupNodes();
+            const t = this.audioCtx.currentTime;
+            this.osc1 = this.audioCtx.createOscillator(); this.osc1.type = 'sawtooth'; this.osc1.frequency.setValueAtTime(62, t);
+            this.osc2 = this.audioCtx.createOscillator(); this.osc2.type = 'triangle'; this.osc2.frequency.setValueAtTime(63.2, t);
+            this.subOsc = this.audioCtx.createOscillator(); this.subOsc.type = 'sine'; this.subOsc.frequency.setValueAtTime(31, t);
+            this.osc1.connect(this.cylinderFilter); this.osc2.connect(this.cylinderFilter); this.subOsc.connect(this.subGain);
+            this.lfoOsc = this.audioCtx.createOscillator(); this.lfoOsc.type = 'sine'; this.lfoOsc.frequency.setValueAtTime(28, t);
+            this.lfoGain = this.audioCtx.createGain(); this.lfoGain.gain.setValueAtTime(0.35, t);
+            this.cylinderGain.gain.setValueAtTime(0.65, t);
+            this.lfoOsc.connect(this.lfoGain); this.lfoGain.connect(this.cylinderGain.gain);
+            if (this.noiseBuffer) { this.noiseSource = this.audioCtx.createBufferSource(); this.noiseSource.buffer = this.noiseBuffer; this.noiseSource.loop = true; this.noiseSource.connect(this.noiseFilter); this.noiseSource.start(t); }
+            this.osc1.start(t); this.osc2.start(t); this.subOsc.start(t); this.lfoOsc.start(t);
+            this.isRunning = true;
+        }
+        _stopNodes() {
+            if (!this.isRunning || !this.audioCtx) return;
+            const t = this.audioCtx.currentTime;
+            try { this.osc1?.stop(t); this.osc2?.stop(t); this.subOsc?.stop(t); this.lfoOsc?.stop(t); this.noiseSource?.stop(t); } catch(e) {}
+            try { this.osc1?.disconnect(); this.osc2?.disconnect(); this.subOsc?.disconnect(); this.lfoOsc?.disconnect(); this.lfoGain?.disconnect(); this.noiseSource?.disconnect(); } catch(e) {}
+            this.osc1 = this.osc2 = this.subOsc = this.lfoOsc = this.lfoGain = this.noiseSource = null;
+            this.isRunning = false;
+        }
+        update(dt = 0.016, isBoosting = false, isBraking = false, isPaused = false, speed = 18.0, camDist = 12.0, turnRate = 0.0, pitchRate = 0.0) {
+            const shouldPlay = this.isActive && this.isEnabled && !this.isMuted;
+            this.targetFade = shouldPlay ? 1.0 : 0.0;
+            if (this.targetFade <= 0.001 && this.currentFade <= 0.001) { if (this.isRunning) this._stopNodes(); return; }
+            if (!this.audioCtx) return;
+            if (this.audioCtx.state === 'suspended' && shouldPlay) this.audioCtx.resume().catch(() => {});
+            this.clock += dt;
+            const fadeRate = shouldPlay ? 1.5 : 2.5;
+            this.currentFade += (this.targetFade - this.currentFade) * Math.min(dt * fadeRate, 1.0);
+            if (!this.isRunning && this.currentFade > 0.01) this._startNodes();
+            let targetRpm = 0.35;
+            if (isPaused || isBraking) { targetRpm = 0.05; }
+            else if (isBoosting) { targetRpm = 1.0; }
+            else if (speed !== undefined) { targetRpm = 0.15 + Math.max(0, Math.min(1, (speed - 5) / 25)) * 0.4; }
+            const rpmLerp = isBoosting ? 4.5 : 2.5;
+            this.currentRpm += (targetRpm - this.currentRpm) * Math.min(dt * rpmLerp, 1.0);
+            if (!this.isRunning) return;
+            const t = this.audioCtx.currentTime, sm = 0.06;
+            const distRatio = Math.max(4.0, camDist) / 12.0;
+            const distGain = Math.min(1.85, Math.max(0.12, 1.0 / Math.pow(distRatio, 0.65)));
+            const distFS   = Math.min(1.4,  Math.max(0.38, 1.0 / Math.pow(distRatio, 0.38)));
+            const rpmJitter = Math.sin(this.clock * 0.9) * 0.022 + Math.sin(this.clock * 2.8) * 0.014 + Math.sin(this.clock * 6.3) * 0.007;
+            const maneuverLoad = Math.min(0.18, (Math.abs(turnRate) + Math.abs(pitchRate)) * 0.12);
+            const rpm = Math.max(0.02, Math.min(1.0, this.currentRpm + rpmJitter + maneuverLoad));
+            const engineFreq = 45 + rpm * 54;
+            const pulseFreq  = 19 + rpm * 25 + Math.sin(this.clock * 1.7) * 1.5;
+            const detune = 0.4 + Math.sin(this.clock * 0.5) * 0.6;
+            const airTurb = Math.sin(this.clock * 2.1) * 22 + Math.sin(this.clock * 5.4) * 14;
+            const cutoff  = Math.max(80,  (175 + rpm * 125) * distFS);
+            const nCutoff = Math.max(100, (215 + rpm * 120 + airTurb) * distFS);
+            if (this.osc1) this.osc1.frequency.setTargetAtTime(engineFreq, t, sm);
+            if (this.osc2) this.osc2.frequency.setTargetAtTime(engineFreq * 1.018 + detune, t, sm);
+            if (this.subOsc) this.subOsc.frequency.setTargetAtTime(engineFreq * 0.5, t, sm);
+            if (this.lfoOsc) this.lfoOsc.frequency.setTargetAtTime(pulseFreq, t, sm);
+            if (this.cylinderFilter) this.cylinderFilter.frequency.setTargetAtTime(cutoff, t, sm);
+            if (this.noiseFilter) this.noiseFilter.frequency.setTargetAtTime(nCutoff, t, sm);
+            const pauseMul = isPaused ? 0.15 : 1.0;
+            const dynGain  = (0.026 + rpm * 0.022) * (this.volume / 0.038) * distGain;
+            if (this.masterGain) this.masterGain.gain.setTargetAtTime(dynGain * this.currentFade * pauseMul, t, sm);
+        }
+        destroy() {
+            this.setActive(false); this._stopNodes();
+            if (this.masterGain) { try { this.masterGain.disconnect(); } catch(e) {} }
+        }
+    }
+
     let audioCtx;
     let windGain, windFilter;
+    let biplaneEngine = null;
 
     function initAudio() {
         if (audioCtx) return;
@@ -4989,6 +5130,12 @@ let isInitializingGui = true;
         windGain.connect(audioCtx.destination);
 
         noiseSource.start();
+
+        if (!biplaneEngine) {
+            biplaneEngine = new BiplaneEngineAudio(audioCtx, audioCtx.destination);
+        } else {
+            biplaneEngine.setAudioContext(audioCtx, audioCtx.destination);
+        }
     }
 
 
@@ -5215,7 +5362,7 @@ let isInitializingGui = true;
         musicTimerID = setTimeout(scheduleNotes, 50);
     }
 
-    document.getElementById('music-toggle').addEventListener('click', () => {
+    document.getElementById('top-music-btn').addEventListener('click', () => {
         initAudio();
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
@@ -5229,19 +5376,15 @@ let isInitializingGui = true;
         }
 
         isMusicPlaying = !isMusicPlaying;
-        const trackBtn = document.getElementById('track-toggle');
+        document.getElementById('top-music-btn').style.opacity = isMusicPlaying ? '1' : '0.65';
         if (isMusicPlaying) {
             sequenceTime = 0;
             chordIndex = 0;
             arpIndex = 0;
             nextNoteTime = audioCtx.currentTime + 0.1;
             scheduleNotes();
-            document.getElementById('music-toggle').innerText = "⏸ Music";
-            trackBtn.style.display = "block";
         } else {
             clearTimeout(musicTimerID);
-            document.getElementById('music-toggle').innerText = "▶ Music";
-            trackBtn.style.display = "none";
         }
     });
 
@@ -5254,6 +5397,15 @@ let isInitializingGui = true;
         arpIndex = 0;
         nextNoteTime = audioCtx.currentTime + 0.1;
     });
+
+    const _engineBtnEl = document.getElementById('top-engine-btn');
+    if (_engineBtnEl) {
+        _engineBtnEl.addEventListener('click', () => {
+            if (!biplaneEngine) return;
+            biplaneEngine.setEnabled(!biplaneEngine.isEnabled);
+            _engineBtnEl.style.opacity = biplaneEngine.isEnabled ? '1' : '0.65';
+        });
+    }
 
     window.addEventListener('keydown', initAudio, { once: true });
     window.addEventListener('touchstart', initAudio, { once: true });

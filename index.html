@@ -157,7 +157,9 @@ console.error = function(...args) {
   <div id="hidden-ui" style="display: none;">
       <button id="editor-toggle">Terrain Editor</button>
       <button id="crystal-edit-toggle">Edit Crystals</button>
-      <button id="char-toggle">Switch to Whale</button>
+      <button id="char-prev">◀ Model</button>
+      <button id="char-name" style="min-width:80px;pointer-events:none;">Kiki</button>
+      <button id="char-next">Model ▶</button>
       <button id="invis-toggle">Model: VISIBLE</button>
       <button id="summer-toggle">Summer Filter: ON</button>
       <button id="music-toggle">Music</button>
@@ -668,7 +670,18 @@ let isInitializingGui = true;
         rain: isRainOn,
         fogPlane: true,
         godRays: !LOW_GFX,
-        godRayIntensity: 0.65,
+        godRayIntensity: 0.34,
+        godRayDensity: 0.40,
+        godRayDecay: 0.92,
+        godRayWeight: 0.80,
+        lumMin: 0.90,
+        lumMax: 0.99,
+        rayColorInner: '#ffea9f',
+        rayColorOuter: '#ff9933',
+        sunAltitude: 1500,
+        sunAzimuth: 0,
+        lockSunToPlayer: true,
+        sunDiscScale: 1.8,
         treeScale: 3.75,
         quality: LOW_GFX ? 'Low' : 'Regular',
         showTerrain: true,
@@ -679,8 +692,32 @@ let isInitializingGui = true;
         cloudsHigh: true,
         cloudsGiant: true,
         cloudsLowCount: LOW_GFX ? 40 : 150,
-        cloudsHighCount: LOW_GFX ? 0 : 24,
-        cloudsGiantCount: LOW_GFX ? 0 : 24,
+        cloudsHighCount: LOW_GFX ? 0 : 28,
+        cloudsGiantCount: LOW_GFX ? 0 : 28,
+        cloudsLowSize: 1.0,
+        cloudsHighSize: 1.2,
+        cloudsGiantSize: 1.2,
+        cloudsLowOpacity: 0.65,
+        cloudsHighOpacity: 0.98,
+        cloudsGiantOpacity: 0.98,
+        cloudsNearSolid: 500,
+        cloudsFarHaze: 3000,
+        cloudsLowBottomBlur: 0.20,
+        cloudsHighBottomBlur: 0.55,
+        cloudsGiantBottomBlur: 0.64,
+        cloudsLowAltitude: 150,
+        cloudsLowDistance: 1200,
+        cloudsHighAltitude: -20,
+        cloudsHighDistance: 3600,
+        cloudsGiantAltitude: -20,
+        cloudsGiantDistance: 4200,
+        cloudsLowColor: '#ffffff',
+        cloudsHighColor: '#ffffff',
+        cloudsGiantColor: '#ffffff',
+        cloudsDayLitColor: '#fffdf6',
+        cloudsDayShadowColor: '#9cb8db',
+        cloudsNightLitColor: '#9ec7eb',
+        cloudsNightShadowColor: '#1a3055',
         showBirds: true,
         showFogPlanes: true,
         showCrystals: true,
@@ -732,7 +769,7 @@ let isInitializingGui = true;
 
     // Actions for GUI
     const guiActions = {
-        switchModel: () => document.getElementById('char-toggle').click(),
+        switchModel: () => fmNext(),
         openCrystalEditor: () => {
             const crystalEditor = document.getElementById('crystal-editor');
             if (crystalEditor) crystalEditor.style.display = crystalEditor.style.display === 'none' ? 'block' : 'none';
@@ -817,26 +854,53 @@ let isInitializingGui = true;
     envFolder.add(params, 'wind').name('Wind').onChange(v => { if(isWindOn !== v) document.getElementById('wind-toggle').click(); });
     envFolder.add(params, 'rain').name('Rain').onChange(v => { isRainOn = v; if(typeof rainSystem !== 'undefined') rainSystem.visible = v; });
     envFolder.add(params, 'fogPlane').name('Ground Fog').onChange(v => { if(typeof window.fogGroup !== 'undefined') window.fogGroup.visible = v; });
-    // God Rays editor (defaults match the GodRaysShader uniforms)
-    const godRayFolder = envFolder.addFolder('God Rays');
-    const godRayParams = { decay: 0.93, density: 0.5, weight: 0.75 };
-    godRayFolder.add(params, 'godRays').name('Enabled').onChange(v => { godRaysPass.enabled = v; });
-    godRayFolder.add(params, 'godRayIntensity', 0, 2, 0.05).name('Intensity').onChange(v => { godRaysPass.uniforms.uIntensity.value = v; });
-    godRayFolder.add(godRayParams, 'decay', 0.8, 1.0, 0.005).name('Decay (ray length)').onChange(v => { godRaysPass.uniforms.uDecay.value = v; });
-    godRayFolder.add(godRayParams, 'density', 0.1, 1.5, 0.05).name('Density (spread)').onChange(v => { godRaysPass.uniforms.uDensity.value = v; });
-    godRayFolder.add(godRayParams, 'weight', 0.1, 1.5, 0.05).name('Weight (brightness)').onChange(v => { godRaysPass.uniforms.uWeight.value = v; });
+    // 3. Sun & God Rays Controls Subfolder (Pulled from Wanderlust-II)
+    const sunGodRaysFolder = envFolder.addFolder('Sun & God Rays Controls');
+    window.sunGodRaysFolder = sunGodRaysFolder;
+    sunGodRaysFolder.add(params, 'sunAltitude', -8000, 15000, 50).name('Sun Height (Altitude)').onChange(v => {
+        params.sunAltitude = v;
+        if (typeof envConfigs !== 'undefined' && envConfigs[timePhase]) {
+            envConfigs[timePhase].sunY = v;
+        }
+    });
+    sunGodRaysFolder.add(params, 'sunAzimuth', -180, 180, 1).name('Sun Azimuth (Angle)').onChange(v => {
+        params.sunAzimuth = v;
+    });
+    sunGodRaysFolder.add(params, 'lockSunToPlayer').name('Lock Sun to Player');
+    sunGodRaysFolder.add(params, 'sunDiscScale', 0.5, 5.0, 0.1).name('Sun Disc Size').onChange(v => {
+        params.sunDiscScale = v;
+        if (typeof staticSun !== 'undefined' && staticSun) staticSun.scale.setScalar(v);
+    });
+    sunGodRaysFolder.add(params, 'godRays').name('God Rays Enable').onChange(v => {
+        godRaysPass.enabled = v;
+    });
+    sunGodRaysFolder.add(params, 'godRayIntensity', 0, 2.5, 0.05).name('Ray Intensity').onChange(v => {
+        godRaysPass.uniforms.uIntensity.value = v;
+    });
+    sunGodRaysFolder.add(params, 'godRayDensity', 0.1, 1.5, 0.05).name('Ray Density').onChange(v => {
+        godRaysPass.uniforms.uDensity.value = v;
+    });
+    sunGodRaysFolder.add(params, 'godRayDecay', 0.80, 0.995, 0.005).name('Ray Decay').onChange(v => {
+        godRaysPass.uniforms.uDecay.value = v;
+    });
+    sunGodRaysFolder.add(params, 'godRayWeight', 0.1, 1.5, 0.05).name('Ray Weight').onChange(v => {
+        godRaysPass.uniforms.uWeight.value = v;
+    });
+    sunGodRaysFolder.add(params, 'lumMin', 0.0, 1.0, 0.01).name('Lum Gate Min').onChange(v => {
+        godRaysPass.uniforms.uLumMin.value = v;
+    });
+    sunGodRaysFolder.add(params, 'lumMax', 0.0, 1.0, 0.01).name('Lum Gate Max').onChange(v => {
+        godRaysPass.uniforms.uLumMax.value = v;
+    });
+    sunGodRaysFolder.addColor(params, 'rayColorInner').name('Ray Color (Inner)').onChange(v => {
+        godRaysPass.uniforms.uRayColorInner.value.set(v);
+    });
+    sunGodRaysFolder.addColor(params, 'rayColorOuter').name('Ray Color (Outer)').onChange(v => {
+        godRaysPass.uniforms.uRayColorOuter.value.set(v);
+    });
     envFolder.add(params, 'trails').name('Wind Trails').onChange(v => isWindTrailsOn = v);
 
-    // Turn individual cloud layers on/off
-    const cloudLayerFolder = envFolder.addFolder('Clouds');
-    cloudLayerFolder.add(params, 'cloudsLow').name('Low Puffy Clouds').onChange(v => { instClouds.visible = v; });
-    cloudLayerFolder.add(params, 'cloudsHigh').name('High Clouds').onChange(v => { instHighClouds.visible = v; });
-    cloudLayerFolder.add(params, 'cloudsGiant').name('Giant Clouds').onChange(v => { instMegaClouds.visible = v; });
-    // How many of each layer to draw (can't go above what the layer was built with)
-    const setCloudCount = (mesh, v) => { mesh.count = Math.min(Math.round(v), mesh.instanceMatrix.count); };
-    cloudLayerFolder.add(params, 'cloudsLowCount', 0, params.cloudsLowCount, 1).name('Low Clouds: How Many').onChange(v => setCloudCount(instClouds, v));
-    cloudLayerFolder.add(params, 'cloudsHighCount', 0, 24, 1).name('High Clouds: How Many').onChange(v => setCloudCount(instHighClouds, v));
-    cloudLayerFolder.add(params, 'cloudsGiantCount', 0, 24, 1).name('Giant Clouds: How Many').onChange(v => setCloudCount(instMegaClouds, v));
+    // Cloud controls have been consolidated into the unified "Clouds" section below
 
     const debugFolder = gui.addFolder('🔧 Debug Render');
     debugFolder.add(params, 'showTerrain').name('Terrain').onChange(v => { terrain.visible = v; });
@@ -972,6 +1036,10 @@ let isInitializingGui = true;
     renderer.toneMappingExposure = 1.8;
     renderer.info.autoReset = false;
     container.appendChild(renderer.domElement);
+    window.camera = camera;
+    window.scene = scene;
+    window.renderer = renderer;
+    window.params = params;
 
     const composer = new EffectComposer(renderer);
     const renderPass = new RenderPass(scene, camera);
@@ -1032,22 +1100,96 @@ let isInitializingGui = true;
     kikiRightLight.position.set(35, 15, 10);
     playerVisuals.add(kikiRightLight);
 
-    // Character Models State
-    let currentCharacter = 'kiki';
-    let kikiModel = null;
-    let whaleModel = null;
-    let whaleMixer = null;
-    let isModelVisible = true;
-
-    const CHAR_CYCLE = [
-        { id: 'kiki', nextLabel: 'Switch to Whale' },
-        { id: 'whale', nextLabel: 'Switch to Kiki' }
+    // ─── Flight Model Manager ────────────────────────────────────────────────
+    const FLIGHT_MODELS = [
+        { id: 'kiki',          name: 'Kiki',      file: 'flight_models/kiki-draco.glb',                                    rotY: 180, scale: 1.3, anim: null },
+        { id: 'whale',         name: 'Whale',     file: 'flight_models/Princess.glb',                                      rotY: 180, scale: 2.8, anim: null },
+        { id: 'savoia',        name: 'Savoia',    file: 'flight_models/psx_saviola_s21.glb',                               rotY: 180, scale: 1.6, anim: 'Saviola flight', isPlane: true },
+        { id: 'mitsubishi',    name: 'B2M2',      file: 'flight_models/mitsubishi_b2m2_-_game_art_1_stylized_plane.glb',   rotY: 180, scale: 1.6, anim: 'Flying', isPlane: true },
+        { id: 'sopwith',       name: 'Sopwith',   file: 'flight_models/sopwith_pup_stylized_-_cupido.glb',                 rotY: 0,   scale: 1.6, anim: 'Take 001', isPlane: true },
+        { id: 'sikorsky',      name: 'Sikorsky',  file: 'flight_models/sikorski_s-16__flying_circus_dae_assignment.glb',   rotY: 180, scale: 1.6, anim: 'Scene', isPlane: true },
+        { id: 'robin',         name: 'Robin',     file: 'flight_models/american_robin_-_in_flight.glb',                   rotY: 180, scale: 1.5, anim: 'Wings Flapping' },
+        { id: 'pewee',         name: 'Pewee',     file: 'flight_models/eastern_wood-pewee_-_in_flight.glb',                rotY: 180, scale: 1.5, anim: 'Wings Flapping' },
+        { id: 'bittern',       name: 'Bittern',   file: 'flight_models/american_bittern_-_in_flight.glb',                 rotY: 180, scale: 1.6, anim: 'Wing Flapping' },
+        { id: 'macaw',         name: 'Macaw',     file: 'flight_models/animated_parrot.glb',                              rotY: 180, scale: 1.6, anim: '02-flying' },
+        { id: 'flock',         name: 'Flock',     file: 'flight_models/birds.glb',                                        rotY: 0,   scale: 1.6, anim: 'Scene' },
+        { id: 'butterfly',     name: 'Morpho',    file: 'flight_models/borboleta_azul_-_butterfly.glb',                   rotY: 270, scale: 2.2, anim: 'ArmatureAction.001' },
+        { id: 'monarch',       name: 'Monarch',   file: 'flight_models/idl_flight_on_spot.glb',                           rotY: 0,   scale: 2.8, anim: 'Take 001', offsetY: 2.5 },
+        { id: 'charizard',     name: 'Charizard', file: 'flight_models/charizard_flying_animation.glb',                   rotY: 180, scale: 1.8, anim: 'Flying' },
     ];
 
-    function updateModelVisibility() {
-        if (kikiModel) kikiModel.visible = isModelVisible && (currentCharacter === 'kiki');
-        if (whaleModel) whaleModel.visible = isModelVisible && (currentCharacter === 'whale');
+    let fmCurrentIndex = 0;
+    let fmCurrentWrapper = null;
+    let fmCurrentMixer = null;
+    const fmCache = new Map(); // id → { wrapper, mixer }
+    let isModelVisible = true;
 
+    function _fmNameBtn(el) {
+        if (el) el.innerText = FLIGHT_MODELS[fmCurrentIndex].name;
+    }
+
+    function _fmLoadAndActivate(index, onDone) {
+        const cfg = FLIGHT_MODELS[index];
+        if (fmCache.has(cfg.id)) {
+            _fmActivate(index); if (onDone) onDone(); return;
+        }
+        gltfLoader.load(cfg.file, (gltf) => {
+            const root = gltf.scene;
+            const rawBox = new THREE.Box3().setFromObject(root);
+            const rawSize = new THREE.Vector3(); rawBox.getSize(rawSize);
+            const rawCenter = new THREE.Vector3(); rawBox.getCenter(rawCenter);
+            const maxDim = Math.max(rawSize.x, rawSize.y, rawSize.z);
+            const baseScale = maxDim > 0 ? (2.0 / maxDim) : 1.0;
+            const finalScale = baseScale * (cfg.scale || 1.0);
+
+            const inner = new THREE.Group();
+            root.position.set(-rawCenter.x, -rawCenter.y, -rawCenter.z);
+            root.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; c.frustumCulled = false; } });
+            inner.rotation.y = (cfg.rotY || 0) * Math.PI / 180;
+            inner.add(root);
+
+            const wrapper = new THREE.Group();
+            wrapper.add(inner);
+            wrapper.scale.setScalar(finalScale);
+            wrapper.position.y = cfg.offsetY || 0;
+            wrapper.visible = false;
+
+            let mixer = null;
+            if (gltf.animations && gltf.animations.length > 0) {
+                mixer = new THREE.AnimationMixer(root);
+                const clip = cfg.anim ? (gltf.animations.find(a => a.name === cfg.anim) || gltf.animations[0]) : gltf.animations[0];
+                if (clip) mixer.clipAction(clip).play();
+            }
+
+            fmCache.set(cfg.id, { wrapper, mixer });
+            playerVisuals.add(wrapper);
+            proxyMesh.visible = false;
+            _fmActivate(index);
+            if (onDone) onDone();
+        }, undefined, (err) => console.warn(`[FlightModel] Failed: ${cfg.file}`, err));
+    }
+
+    function _fmActivate(index) {
+        if (fmCurrentWrapper) fmCurrentWrapper.visible = false;
+        fmCurrentIndex = index;
+        const { wrapper, mixer } = fmCache.get(FLIGHT_MODELS[index].id);
+        fmCurrentWrapper = wrapper;
+        fmCurrentMixer = mixer;
+        fmCurrentWrapper.visible = isModelVisible;
+        _fmNameBtn(document.getElementById('char-name'));
+    }
+
+    function fmNext() {
+        const next = (fmCurrentIndex + 1) % FLIGHT_MODELS.length;
+        _fmLoadAndActivate(next);
+    }
+    function fmPrev() {
+        const prev = (fmCurrentIndex - 1 + FLIGHT_MODELS.length) % FLIGHT_MODELS.length;
+        _fmLoadAndActivate(prev);
+    }
+
+    function updateModelVisibility() {
+        if (fmCurrentWrapper) fmCurrentWrapper.visible = isModelVisible;
         const btn = document.getElementById('invis-toggle');
         if (btn) btn.innerText = isModelVisible ? '👁 Model: VISIBLE' : '👁 Model: INVISIBLE';
     }
@@ -1057,14 +1199,8 @@ let isInitializingGui = true;
         updateModelVisibility();
         if (typeof params !== 'undefined') params.modelVisible = isModelVisible;
     });
-
-    document.getElementById('char-toggle')?.addEventListener('click', () => {
-        const idx = CHAR_CYCLE.findIndex(c => c.id === currentCharacter);
-        const nextIdx = (idx + 1) % CHAR_CYCLE.length;
-        currentCharacter = CHAR_CYCLE[nextIdx].id;
-        document.getElementById('char-toggle').innerText = CHAR_CYCLE[nextIdx].nextLabel;
-        updateModelVisibility();
-    });
+    document.getElementById('char-next')?.addEventListener('click', fmNext);
+    document.getElementById('char-prev')?.addEventListener('click', fmPrev);
 
     const GhibliSummerShader = {
         uniforms: {
@@ -1116,10 +1252,15 @@ let isInitializingGui = true;
         uniforms: {
             tDiffuse: { value: null },
             uSunScreenPos: { value: new THREE.Vector2(0.5, 0.5) },
-            uIntensity: { value: 0.65 },
-            uDecay: { value: 0.93 },
-            uDensity: { value: 0.50 },
-            uWeight: { value: 0.75 },
+            uIntensity: { value: 0.34 },
+            uDecay: { value: 0.92 },
+            uDensity: { value: 0.40 },
+            uWeight: { value: 0.80 },
+            uLumMin: { value: 0.90 },
+            uLumMax: { value: 0.99 },
+            uRayColorInner: { value: new THREE.Color('#ffea9f') },
+            uRayColorOuter: { value: new THREE.Color('#ff9933') },
+            uEdgeFadeDist: { value: 1.5 },
             uSunVisible: { value: 1.0 }
         },
         vertexShader: `
@@ -1136,6 +1277,11 @@ let isInitializingGui = true;
             uniform float uDecay;
             uniform float uDensity;
             uniform float uWeight;
+            uniform float uLumMin;
+            uniform float uLumMax;
+            uniform vec3 uRayColorInner;
+            uniform vec3 uRayColorOuter;
+            uniform float uEdgeFadeDist;
             uniform float uSunVisible;
             varying vec2 vUv;
 
@@ -1160,9 +1306,10 @@ let isInitializingGui = true;
 
                 for(int i = 0; i < 16; i++) {
                     sampleUV -= deltaUV;
-                    vec4 samp = texture2D(tDiffuse, sampleUV);
+                    vec4 samp = texture2D(tDiffuse, clamp(sampleUV, 0.001, 0.999));
                     float lum = dot(samp.rgb, vec3(0.299, 0.587, 0.114));
-                    float bright = smoothstep(0.45, 0.85, lum);
+                    // High luminance cutoff prevents clouds from emitting false god rays
+                    float bright = smoothstep(uLumMin, uLumMax, lum);
                     illumination += bright * currentWeight;
                     currentWeight *= uDecay;
                 }
@@ -1171,10 +1318,11 @@ let isInitializingGui = true;
                 illumination *= 1.85;
 
                 // Fade out rays near screen edges and when sun is off-screen
-                float edgeFade = 1.0 - smoothstep(0.4, 1.5, dist);
+                float edgeFade = 1.0 - smoothstep(0.4, uEdgeFadeDist, dist);
 
-                // Warm golden tint for the rays
-                vec3 rayColor = vec3(1.0, 0.9, 0.7) * illumination * uIntensity * edgeFade * uSunVisible;
+                // Dual-tone sunset/daylight radial gradient from Wanderlust-II
+                vec3 rayTint = mix(uRayColorInner, uRayColorOuter, smoothstep(0.0, uEdgeFadeDist * 0.7, dist));
+                vec3 rayColor = rayTint * illumination * uIntensity * edgeFade * uSunVisible;
 
                 gl_FragColor = vec4(texel.rgb + rayColor, texel.a);
             }
@@ -1741,7 +1889,8 @@ let isInitializingGui = true;
     // ==========================================
     const matRock = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, dithering: true });
     const matBush = new THREE.MeshToonMaterial({ color: 0x48a868, gradientMap, dithering: true });
-    const matCloud = new THREE.MeshToonMaterial({ color: 0xfffaec, transparent: true, opacity: 0.65, gradientMap, dithering: true });
+    const matCloud = new THREE.MeshToonMaterial({ color: 0xfffaec, transparent: true, opacity: params.cloudsLowOpacity, depthWrite: true, side: THREE.FrontSide });
+    setupToonCloudShader(matCloud, params.cloudsLowBottomBlur);
     const matWispyCloud = new THREE.MeshToonMaterial({ color: 0xffffff, transparent: true, opacity: 0.42, gradientMap, dithering: true });
     const matFlower = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap, dithering: true });
     const terrainMat = new THREE.MeshToonMaterial({
@@ -2242,22 +2391,8 @@ let isInitializingGui = true;
     b3.translate(0, 0.3, 0);
     b3.rotateX(-0.2);
 
-    const geoCloud = new THREE.IcosahedronGeometry(25, 2);
-    geoCloud.scale(2.0, 1.0, 1.5);
-    const cpos = geoCloud.attributes.position;
-    for (let i = 0; i < cpos.count; i++) {
-        let x = cpos.getX(i);
-        let y = cpos.getY(i);
-        let z = cpos.getZ(i);
-        if (y < 0) {
-            y *= 0.3;
-        } else {
-            let billow = Math.sin(x * 0.2) * Math.cos(z * 0.2) * 4.0;
-            y += Math.max(0, billow);
-        }
-        cpos.setXYZ(i, x, y, z);
-    }
-    geoCloud.computeVertexNormals();
+    // Was a squashed 20-sided ball, which read as a flat paper cut-out from underneath.
+    const geoCloud = buildLowCloud();
 
     // Meshes
     // Pines only (oaks removed)
@@ -2528,32 +2663,440 @@ let isInitializingGui = true;
     instClouds.frustumCulled = false;
     scene.add(instClouds);
 
-    // Super High Cumulonimbus Clouds & See-Through Wispy Clouds
-    const HIGH_CLOUD_COUNT = LOW_GFX ? 0 : 24;
-    const baseCloudSpheres = [];
-    const mainPillar = new THREE.DodecahedronGeometry(150, 1).toNonIndexed();
-    mainPillar.scale(1, 1.2, 1);
-    baseCloudSpheres.push(mainPillar);
+    // =========================================================================
+    // GHIBLI DISTANT CLOUDS GENERATOR (Fluffy, Dense but Light Anime Clouds)
+    // =========================================================================
+    // Small repeatable random number source, so the clouds look identical on every reload
+    function cloudRand(seed) {
+        let s = (seed | 0) >>> 0;
+        return function () {
+            s = (s + 0x6D2B79F5) >>> 0;
+            let t = s;
+            t = Math.imul(t ^ (t >>> 15), t | 1);
+            t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+    }
 
-    const fluff1 = new THREE.DodecahedronGeometry(110, 1).toNonIndexed();
-    fluff1.translate(120, -30, 40);
-    baseCloudSpheres.push(fluff1);
+    // One puff. The surface is pushed in and out at three different sizes of bump, so the
+    // outline never reads as a plain ball: big billows, cauliflower lumps, then a fine crinkle.
+    function createFluffyLobe(radius, segW = 36, segH = 26, squashY = 0.85, noiseAmp = 0.13, seed = 1) {
+        const geo = new THREE.SphereGeometry(radius, segW, segH);
+        const pos = geo.attributes.position;
+        const rnd = cloudRand(seed);
+        const p1 = rnd() * 6.2832, p2 = rnd() * 6.2832, p3 = rnd() * 6.2832;
+        for (let i = 0; i < pos.count; i++) {
+            let x = pos.getX(i);
+            let y = pos.getY(i);
+            let z = pos.getZ(i);
+            const len = Math.sqrt(x * x + y * y + z * z) || 1.0;
+            const nx = x / len;
+            const ny = y / len;
+            const nz = z / len;
 
-    const fluff2 = new THREE.DodecahedronGeometry(90, 1).toNonIndexed();
-    fluff2.translate(-100, -50, 80);
-    baseCloudSpheres.push(fluff2);
+            const b1 = Math.sin(nx * 2.1 + p1) * Math.cos(ny * 1.7 + nz * 1.4 + p2);
+            const b2 = Math.sin(nx * 4.6 + nz * 4.1 + p2) * Math.cos(ny * 4.3 + nx * 3.8 + p3) * 0.55;
+            const b3 = Math.sin(nx * 6.1 + ny * 5.7 + p3) * Math.cos(nz * 6.3 + p1) * 0.11;
+            let bump = (b1 + b2 + b3) * noiseAmp;
 
-    const fluff3 = new THREE.DodecahedronGeometry(130, 1).toNonIndexed();
-    fluff3.translate(-40, 20, -110);
-    baseCloudSpheres.push(fluff3);
+            // Real cumulus have a calm, flattish underside - keep the lumps on top and around the sides
+            bump *= 0.32 + 0.68 * Math.max(0.0, ny * 0.5 + 0.5);
 
-    const fluff4 = new THREE.DodecahedronGeometry(80, 1).toNonIndexed();
-    fluff4.translate(60, 60, 90);
-    baseCloudSpheres.push(fluff4);
+            const r = radius * (1.0 + bump);
+            pos.setXYZ(i, nx * r, ny * r * squashY, nz * r);
+        }
+        geo.computeVertexNormals();
+        return geo;
+    }
 
-    const highCloudGeo = BufferGeometryUtils.mergeGeometries(baseCloudSpheres);
-    highCloudGeo.computeVertexNormals();
-    const highCloudMat = new THREE.MeshToonMaterial({ color: 0xffffff, transparent: true, opacity: 0.7 });
+    // Grows smaller puffs out of the sides and tops of bigger puffs. This is what turns a
+    // stack of balls into a knobbly cloud. Two rounds: buds, then buds on the buds.
+    function growPuffBuds(parents, seed, countMin, countMax, sizeMin, sizeMax) {
+        const rnd = cloudRand(seed);
+        const buds = [];
+        for (let i = 0; i < parents.length; i++) {
+            const p = parents[i];
+            const n = countMin + Math.floor(rnd() * (countMax - countMin + 1));
+            for (let k = 0; k < n; k++) {
+                const ang = rnd() * 6.2832;
+                const up = -0.20 + rnd() * 1.10;                       // mostly upper half, never straight down
+                const horiz = Math.sqrt(Math.max(0.0, 1.0 - up * up));
+                const cr = p.r * (sizeMin + rnd() * (sizeMax - sizeMin));
+                let d = p.r * (0.72 + rnd() * 0.22);                     // sit on the parent's shoulder
+                d = Math.max(d, p.r * 1.20 - cr);                        // ...but always poke clearly out of it
+                d = Math.min(d, p.r * 0.96);                             // ...while staying attached
+                const psy = p.sy || 0.85;
+                buds.push({
+                    r: cr,
+                    x: p.x + Math.cos(ang) * horiz * d,
+                    y: p.y + up * d * psy,
+                    z: p.z + Math.sin(ang) * horiz * d,
+                    sy: Math.min(1.12, psy + 0.10),
+                    noise: 0.030
+                });
+            }
+        }
+        return buds;
+    }
+
+    // Builds the main puffs plus both rounds of buds and drops them all into the lobe list.
+    // Smaller puffs get fewer segments, which keeps the triangle count close to where it was.
+    function addPuffLobes(puffs, lobes, seed, opts) {
+        const o = opts || {};
+        const segParent = o.segParent || [28, 20];
+        const segBud = o.segBud || [12, 9];
+        const segSub = o.segSub || [8, 6];
+        const budMin = o.budMin !== undefined ? o.budMin : 2;
+        const budMax = o.budMax !== undefined ? o.budMax : 4;
+
+        let s = seed;
+        puffs.forEach(p => {
+            const g = createFluffyLobe(p.r, segParent[0], segParent[1], p.sy, (p.noise || 0.025) * 5.4, s++);
+            g.translate(p.x, p.y, p.z);
+            lobes.push(g);
+        });
+
+        const buds = growPuffBuds(puffs, seed + 101, budMin, budMax, 0.30, 0.54);
+        buds.forEach(p => {
+            const g = createFluffyLobe(p.r, segBud[0], segBud[1], p.sy, p.noise * 5.4, s++);
+            g.translate(p.x, p.y, p.z);
+            lobes.push(g);
+        });
+
+        // Only the chunkier buds are worth budding again - tiny ones add cost and no silhouette
+        const bigBuds = buds.filter(b => b.r > 60);
+        const subBuds = growPuffBuds(bigBuds, seed + 977, 1, 1, 0.34, 0.52);
+        subBuds.forEach(p => {
+            const g = createFluffyLobe(p.r, segSub[0], segSub[1], p.sy, p.noise * 5.4, s++);
+            g.translate(p.x, p.y, p.z);
+            lobes.push(g);
+        });
+    }
+
+    // Small nearby cumulus. Same puff-and-bud build as the big clouds, but far fewer
+    // segments because there are ~120 of these on screen at once.
+    function buildLowCloud() {
+        const lobes = [];
+        const lowPuffs = [
+            { r: 17, x: -23, y: 2,  z: 6,   sy: 0.60, noise: 0.028 },
+            { r: 20, x: 0,   y: 4,  z: -5,  sy: 0.64, noise: 0.028 },
+            { r: 16, x: 23,  y: 2,  z: 8,   sy: 0.60, noise: 0.028 },
+            { r: 12, x: -40, y: -2, z: -6,  sy: 0.52, noise: 0.025 },
+            { r: 11, x: 40,  y: -3, z: 5,   sy: 0.52, noise: 0.025 },
+            { r: 14, x: -11, y: 14, z: 4,   sy: 0.78, noise: 0.030 },
+            { r: 13, x: 12,  y: 15, z: -6,  sy: 0.78, noise: 0.030 },
+            { r: 10, x: 0,   y: 24, z: 0,   sy: 0.86, noise: 0.030 }
+        ];
+        addPuffLobes(lowPuffs, lobes, 4242, {
+            segParent: [14, 10],
+            segBud: [8, 6],
+            budMin: 2,
+            budMax: 3
+        });
+        return finishCloudGeometry(lobes);
+    }
+
+    function cloudSeedFor(archetype) {
+        const name = String(archetype);
+        let h = 2166136261;
+        for (let i = 0; i < name.length; i++) { h ^= name.charCodeAt(i); h = Math.imul(h, 16777619); }
+        return (h >>> 0) % 100000;
+    }
+
+    function buildProceduralCloud(archetype = 'tower') {
+        const lobes = [];
+
+        if (archetype === false || archetype === 'tower') {
+            // Majestic Marine Cumulus Bank (Voluminous, natural horizon cumulus like reference photo)
+            const towerPuffs = [
+                // Deep, wide foundation resting in horizon mist (staggered depths and heights)
+                { r: 180, x: -180, y: 18,  z: 20,   sy: 0.65, noise: 0.02 },
+                { r: 210, x: 0,    y: 32,  z: -10,  sy: 0.68, noise: 0.02 },
+                { r: 180, x: 180,  y: 16,  z: 15,   sy: 0.65, noise: 0.02 },
+                { r: 145, x: -330, y: -2,  z: 10,   sy: 0.58, noise: 0.02 },
+                { r: 145, x: 330,  y: -5,  z: -10,  sy: 0.58, noise: 0.02 },
+
+                // Mid-tier billowing cumulus body (deeply overlapping, pillowy volume)
+                { r: 175, x: -110, y: 130, z: 15,   sy: 0.84, noise: 0.025 },
+                { r: 185, x: 80,   y: 140, z: -10,  sy: 0.86, noise: 0.025 },
+                { r: 145, x: -240, y: 95,  z: -15,  sy: 0.78, noise: 0.02 },
+                { r: 145, x: 250,  y: 100, z: 20,   sy: 0.78, noise: 0.02 },
+
+                // Grand ascending crowns (multi-peaked natural cumulus towers)
+                { r: 160, x: -50,  y: 240, z: 5,    sy: 0.94, noise: 0.03 },
+                { r: 150, x: 90,   y: 230, z: -5,   sy: 0.92, noise: 0.03 },
+
+                // Majestic summits (broad, soft, rounded cumulus peaks)
+                { r: 130, x: -25,  y: 320, z: 0,    sy: 1.00, noise: 0.03 },
+                { r: 110, x: 55,   y: 305, z: -5,   sy: 0.96, noise: 0.03 }
+            ];
+            addPuffLobes(towerPuffs, lobes, cloudSeedFor(archetype));
+        } else if (archetype === 'fortress') {
+            // Archetype B: Grand Cumulus Massif Bank (~900m wide, stepped cascading shoulders, summit y ~ 360)
+            const fortressPuffs = [
+                // Staggered base
+                { r: 175, x: 0,    y: 22,  z: 0,   sy: 0.55, noise: 0.02 },
+                { r: 150, x: -160, y: 12,  z: 18,  sy: 0.50, noise: 0.02 },
+                { r: 150, x: 160,  y: 14,  z: -18, sy: 0.50, noise: 0.02 },
+                { r: 110, x: -290, y: -4,  z: 12,  sy: 0.45, noise: 0.02 },
+                { r: 110, x: 290,  y: -6,  z: -12, sy: 0.45, noise: 0.02 },
+                // Tier 2 shoulders
+                { r: 155, x: -80,  y: 85,  z: 12,  sy: 0.84, noise: 0.025 },
+                { r: 160, x: 75,   y: 88,  z: -12, sy: 0.84, noise: 0.025 },
+                { r: 120, x: -190, y: 72,  z: -15, sy: 0.78, noise: 0.025 },
+                { r: 120, x: 190,  y: 72,  z: 15,  sy: 0.78, noise: 0.025 },
+                { r: 95,  x: -280, y: 52,  z: 10,  sy: 0.70, noise: 0.02 },
+                { r: 95,  x: 280,  y: 52,  z: -10, sy: 0.70, noise: 0.02 },
+                // Tier 3 central massif
+                { r: 148, x: 0,    y: 160, z: 10,  sy: 0.95, noise: 0.03 },
+                { r: 128, x: -90,  y: 155, z: -10, sy: 0.90, noise: 0.03 },
+                { r: 128, x: 85,   y: 158, z: 12,  sy: 0.90, noise: 0.03 },
+                { r: 112, x: -35,  y: 215, z: -6,  sy: 1.00, noise: 0.03 },
+                { r: 112, x: 35,   y: 212, z: 8,   sy: 1.00, noise: 0.03 },
+                // Tier 4 summit peaks
+                { r: 95,  x: 0,    y: 275, z: 0,   sy: 1.08, noise: 0.03 },
+                { r: 75,  x: -25,  y: 315, z: 6,   sy: 1.12, noise: 0.03 },
+                { r: 72,  x: 20,   y: 320, z: -6,  sy: 1.12, noise: 0.03 },
+                { r: 52,  x: 0,    y: 350, z: 0,   sy: 1.15, noise: 0.03 }
+            ];
+            addPuffLobes(fortressPuffs, lobes, cloudSeedFor(archetype));
+        } else if (archetype === 'asymmetric') {
+            // Archetype C: Asymmetric Wind-Swept Bank (y ~ 350)
+            const asymPuffs = [
+                // Staggered base
+                { r: 165, x: -130, y: 18,  z: 10,  sy: 0.55, noise: 0.02 },
+                { r: 145, x: 0,    y: 14,  z: -10, sy: 0.50, noise: 0.02 },
+                { r: 130, x: 120,  y: 10,  z: 12,  sy: 0.48, noise: 0.02 },
+                { r: 105, x: 225,  y: -2,  z: -10, sy: 0.45, noise: 0.02 },
+                { r: 85,  x: 310,  y: -6,  z: 6,   sy: 0.42, noise: 0.02 },
+                // Tier 2 rising windward body
+                { r: 155, x: -120, y: 92,  z: 15,  sy: 0.88, noise: 0.025 },
+                { r: 135, x: -20,  y: 84,  z: 6,   sy: 0.82, noise: 0.025 },
+                { r: 110, x: 75,   y: 72,  z: -10, sy: 0.75, noise: 0.025 },
+                { r: 90,  x: 165,  y: 58,  z: 10,  sy: 0.68, noise: 0.02 },
+                // Tier 3 upper head
+                { r: 140, x: -110, y: 165, z: 10,  sy: 0.98, noise: 0.03 },
+                { r: 115, x: -25,  y: 145, z: -6,  sy: 0.88, noise: 0.03 },
+                { r: 105, x: 35,   y: 122, z: 10,  sy: 0.82, noise: 0.03 },
+                { r: 115, x: -95,  y: 228, z: -4,  sy: 1.05, noise: 0.03 },
+                // Tier 4 windward crown
+                { r: 95,  x: -90,  y: 282, z: 6,   sy: 1.10, noise: 0.03 },
+                { r: 72,  x: -80,  y: 324, z: -4,  sy: 1.14, noise: 0.03 },
+                { r: 52,  x: -75,  y: 355, z: 4,   sy: 1.15, noise: 0.03 }
+            ];
+            addPuffLobes(asymPuffs, lobes, cloudSeedFor(archetype));
+        } else if (archetype === 'undulating') {
+            // Archetype D: Undulating Double-Dome Ridge (Twin towering peaks with central saddle, y ~ 340)
+            const undPuffs = [
+                // Staggered base
+                { r: 165, x: -120, y: 16,  z: 18,  sy: 0.55, noise: 0.02 },
+                { r: 170, x: 120,  y: 18,  z: -18, sy: 0.55, noise: 0.02 },
+                { r: 130, x: 0,    y: 8,   z: 0,   sy: 0.48, noise: 0.02 },
+                { r: 100, x: -250, y: -4,  z: 12,  sy: 0.45, noise: 0.02 },
+                { r: 105, x: 250,  y: -6,  z: -12, sy: 0.45, noise: 0.02 },
+                // Tier 2 twin bodies
+                { r: 145, x: -125, y: 90,  z: 15,  sy: 0.88, noise: 0.025 },
+                { r: 150, x: 125,  y: 92,  z: -15, sy: 0.88, noise: 0.025 },
+                { r: 110, x: 0,    y: 65,  z: -6,  sy: 0.72, noise: 0.025 },
+                { r: 100, x: -220, y: 62,  z: 10,  sy: 0.68, noise: 0.02 },
+                { r: 100, x: 220,  y: 62,  z: -10, sy: 0.68, noise: 0.02 },
+                // Tier 3 ascending domes
+                { r: 128, x: -115, y: 160, z: 10,  sy: 1.00, noise: 0.03 },
+                { r: 134, x: 115,  y: 164, z: -10, sy: 1.00, noise: 0.03 },
+                { r: 98,  x: 0,    y: 120, z: 6,   sy: 0.80, noise: 0.025 },
+                { r: 108, x: -105, y: 220, z: 12,  sy: 1.06, noise: 0.03 },
+                { r: 114, x: 105,  y: 224, z: -12, sy: 1.06, noise: 0.03 },
+                // Tier 4 twin peaks
+                { r: 86,  x: -95,  y: 274, z: 6,   sy: 1.12, noise: 0.03 },
+                { r: 90,  x: 95,   y: 278, z: -6,  sy: 1.12, noise: 0.03 },
+                { r: 60,  x: -90,  y: 316, z: 4,   sy: 1.15, noise: 0.03 },
+                { r: 62,  x: 90,   y: 320, z: -4,  sy: 1.15, noise: 0.03 }
+            ];
+            addPuffLobes(undPuffs, lobes, cloudSeedFor(archetype));
+        } else {
+            // Archetype A / Default Horizon: Wide Terraced Horizon Shelf (~900m wide, y ~ 290)
+            const megaPuffs = [
+                // Staggered continuous base
+                { r: 175, x: -95,  y: 18,  z: 12,  sy: 0.55, noise: 0.02 },
+                { r: 180, x: 95,   y: 20,  z: -12, sy: 0.55, noise: 0.02 },
+                { r: 140, x: -225, y: 10,  z: 15,  sy: 0.48, noise: 0.02 },
+                { r: 145, x: 225,  y: 12,  z: -15, sy: 0.48, noise: 0.02 },
+                { r: 95,  x: -330, y: -4,  z: 10,  sy: 0.45, noise: 0.02 },
+                { r: 100, x: 330,  y: -6,  z: -10, sy: 0.45, noise: 0.02 },
+                // Tier 2 terraces
+                { r: 150, x: -60,  y: 90,  z: 15,  sy: 0.85, noise: 0.025 },
+                { r: 152, x: 65,   y: 92,  z: -15, sy: 0.85, noise: 0.025 },
+                { r: 125, x: -165, y: 78,  z: -10, sy: 0.78, noise: 0.025 },
+                { r: 128, x: 170,  y: 80,  z: 10,  sy: 0.78, noise: 0.025 },
+                { r: 90,  x: -275, y: 57,  z: 6,   sy: 0.65, noise: 0.02 },
+                { r: 92,  x: 275,  y: 59,  z: -6,  sy: 0.65, noise: 0.02 },
+                // Tier 3 mid-shelf
+                { r: 130, x: 0,    y: 155, z: 0,   sy: 0.95, noise: 0.03 },
+                { r: 114, x: -90,  y: 150, z: 10,  sy: 0.90, noise: 0.03 },
+                { r: 116, x: 90,   y: 152, z: -10, sy: 0.90, noise: 0.03 },
+                { r: 96,  x: -24,  y: 206, z: -6,  sy: 1.02, noise: 0.03 },
+                { r: 98,  x: 24,   y: 209, z: 6,   sy: 1.02, noise: 0.03 },
+                // Tier 4 shelf crown
+                { r: 75,  x: 0,    y: 252, z: 0,   sy: 1.08, noise: 0.03 },
+                { r: 54,  x: -15,  y: 278, z: 4,   sy: 1.12, noise: 0.03 },
+                { r: 54,  x: 15,   y: 281, z: -4,  sy: 1.12, noise: 0.03 }
+            ];
+            addPuffLobes(megaPuffs, lobes, cloudSeedFor(archetype));
+        }
+
+        return finishCloudGeometry(lobes);
+    }
+
+    // Merges the puffs into one cloud and works out its shading. Shared by every cloud layer.
+    function finishCloudGeometry(lobes) {
+        const merged = BufferGeometryUtils.mergeGeometries(lobes);
+        const pos = merged.attributes.position;
+        let minY = Infinity, maxY = -Infinity;
+        for (let i = 0; i < pos.count; i++) {
+            const y = pos.getY(i);
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+
+        const heightSpan = Math.max(1, maxY - minY);
+        const localYArr = new Float32Array(pos.count);
+        for (let i = 0; i < pos.count; i++) {
+            localYArr[i] = Math.max(0.0, Math.min(1.0, (pos.getY(i) - minY) / heightSpan));
+        }
+        merged.setAttribute('aLocalY', new THREE.BufferAttribute(localYArr, 1));
+        merged.computeVertexNormals();
+
+        // Normal blending: smoothly blend outward radial direction with smooth vertex normal
+        // Softens internal crevice seams into one unified, pillowy, fluffy cloud!
+        // The puffs overlap, so in places two skins sit at almost the same distance from the
+        // camera and the renderer flickers between them - that was the sparkly grain.
+        // Fix: work out the shading normal purely from WHERE a point is, never from which puff
+        // it belongs to. Both skins in an overlap then get the exact same normal, shade the
+        // same, and the flicker has nothing to show. It also gives the flat, painted toon look.
+        const norm = merged.attributes.normal;
+        const vPos = new THREE.Vector3();
+        const vNorm = new THREE.Vector3();
+        const vDir = new THREE.Vector3();
+        const wob = 0.011;      // size of the soft billow shading
+        for (let i = 0; i < pos.count; i++) {
+            vPos.set(pos.getX(i), pos.getY(i), pos.getZ(i));
+
+            // outward from the cloud's own body, lifted so the underside still catches sky
+            const dy = Math.max(0.0, vPos.y - minY) * 0.65 + heightSpan * 0.25;
+            vDir.set(vPos.x, dy, vPos.z).normalize();
+
+            // gentle position-driven billowing so it isn't one featureless blob
+            const ax = Math.sin(vPos.z * wob * 1.7 + vPos.y * wob * 1.3);
+            const ay = Math.sin(vPos.x * wob * 1.1 + vPos.z * wob * 0.9);
+            const az = Math.sin(vPos.y * wob * 1.2 + vPos.x * wob * 0.8);
+
+            vNorm.copy(vDir).addScaledVector(new THREE.Vector3(ax, ay, az), 0.30).normalize();
+            vNorm.y = Math.max(vNorm.y, 0.20);
+            vNorm.normalize();
+            norm.setXYZ(i, vNorm.x, vNorm.y, vNorm.z);
+        }
+
+        return merged;
+    }
+
+    function setupToonCloudShader(mat, defaultBlur = 0.45) {
+        mat.fog = false; // Distant clouds handle their own atmospheric haze to blend seamlessly with horizon!
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uSunDir = { value: new THREE.Vector3(0.4, 0.8, 0.3).normalize() };
+            shader.uniforms.uSunLitColor = { value: new THREE.Color(0xeff0ea) }; // Soft sunlit white, kept just under the god-ray brightness gate
+            shader.uniforms.uSkyShadowColor = { value: new THREE.Color(0x9ab4d0) }; // Soft luminous sky-blue ambient (lifted: deep slate read as grey)
+            shader.uniforms.uHorizonColor = { value: new THREE.Color(0xbcdcf2) }; // Seamless horizon mist tone
+            shader.uniforms.uRimColor = { value: new THREE.Color(0xffffff) };
+            shader.uniforms.uCloudTint = { value: new THREE.Color(0xffffff) };
+            shader.uniforms.uCloudOpacity = { value: mat.opacity !== undefined ? mat.opacity : 0.98 };
+            shader.uniforms.uBottomBlur = { value: defaultBlur };
+            shader.uniforms.uNearSolid = { value: params.cloudsNearSolid };   // inside this distance clouds are solid fluff
+            shader.uniforms.uFarHaze = { value: params.cloudsFarHaze };       // past this they melt into horizon haze
+
+            if (!window.cloudShaderUniformsList) window.cloudShaderUniformsList = [];
+            window.cloudShaderUniformsList.push(shader.uniforms);
+            mat.userData.shader = shader;
+
+            shader.vertexShader = 'attribute float aLocalY;\nvarying float vLocalY;\nvarying vec3 vWorldNormal;\nvarying vec3 vWorldPos;\n' + shader.vertexShader;
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <worldpos_vertex>',
+                [
+                    '#include <worldpos_vertex>',
+                    '#ifdef USE_INSTANCING',
+                    '    mat4 _cloudM = modelMatrix * instanceMatrix;',
+                    '#else',
+                    '    mat4 _cloudM = modelMatrix;',
+                    '#endif',
+                    'vWorldPos = (_cloudM * vec4(transformed, 1.0)).xyz;',
+                    'vWorldNormal = normalize(mat3(_cloudM) * normal);',
+                    'vLocalY = aLocalY;'
+                ].join('\n')
+            );
+
+            shader.fragmentShader = 'uniform vec3 uSunDir;\nuniform vec3 uSunLitColor;\nuniform vec3 uSkyShadowColor;\nuniform vec3 uHorizonColor;\nuniform vec3 uRimColor;\nuniform vec3 uCloudTint;\nuniform float uCloudOpacity;\nuniform float uBottomBlur;\nuniform float uNearSolid;\nuniform float uFarHaze;\nvarying float vLocalY;\nvarying vec3 vWorldNormal;\nvarying vec3 vWorldPos;\n' + shader.fragmentShader;
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <opaque_fragment>',
+                [
+                    'vec3 norm = normalize(vWorldNormal);',
+                    'vec3 sunDir = normalize(uSunDir);',
+                    'vec3 vDir = normalize(cameraPosition - vWorldPos);',
+                    // Nearby clouds stay solid and white; only far banks fade into the horizon
+                    'float camDist = length(cameraPosition - vWorldPos);',
+                    'float nearness = 1.0 - smoothstep(uNearSolid, uFarHaze, camDist);',
+
+                    // Soft wrapped diffuse: wide, gentle lighting gradient (not harsh cel-shaded cutoffs!)
+                    'float NdotL = dot(norm, sunDir);',
+                    'float lightWrap = clamp(NdotL * 0.46 + 0.56, 0.0, 1.0);',
+                    'float diffuse = smoothstep(0.04, 0.82, lightWrap);',
+
+                    // Ambient sky bounce for deep cloud shadows (Ghibli soft luminous ambient fill)
+                    'float skyAmb = clamp(norm.y * 0.26 + 0.76, 0.70, 1.0);',
+
+                    // Height gradient: base is soft atmospheric tone, crown is sunlit white
+                    'vec3 deepShadow = mix(uSkyShadowColor * skyAmb, uSunLitColor, 0.40);',
+                    'vec3 shadowTone = mix(uHorizonColor, deepShadow, smoothstep(0.02, 0.62, vLocalY));',
+                    'vec3 litTone = uSunLitColor + vec3(smoothstep(0.55, 1.0, vLocalY) * 0.08);',
+                    'vec3 col = mix(shadowTone, litTone, diffuse);',
+                    // wash the whole base (lit side included) into horizon haze so the bank has no cut-off edge
+                    'vec3 hazed = mix(uHorizonColor, col, smoothstep(0.0, 0.55, vLocalY));',
+                    'col = mix(hazed, col, nearness);',
+                    'col *= uCloudTint;',
+
+                    // Organic Bottom Feathering & Blur (Dissolves softly into the sky/horizon with ZERO harsh cutoffs!)
+                    'float bottomWave = sin(vWorldPos.x * 0.0016 + vWorldPos.z * 0.0013) * 0.10',
+                    '                 + sin(vWorldPos.x * 0.0051 - vWorldPos.z * 0.0044) * 0.055',
+                    '                 + sin(vWorldPos.x * 0.0123 + vWorldPos.z * 0.0109) * 0.025;',
+                    'float fadeProgress = clamp((vLocalY + bottomWave) / max(uBottomBlur, 0.05), 0.0, 1.0);',
+                    'float bottomDissolve = smoothstep(0.0, 1.0, fadeProgress);',
+
+                    'float nearDissolve = mix(bottomDissolve, 1.0, nearness * 0.88);',
+                    'float alpha = mix(uCloudOpacity, 1.0, nearness) * nearDissolve;',
+                    'if (alpha < 0.003) discard;',
+
+                    'outgoingLight = col;',
+                    '#ifdef OPAQUE',
+                    'diffuseColor.a = 1.0;',
+                    '#endif',
+                    'gl_FragColor = vec4(outgoingLight, alpha);'
+                ].join('\n')
+            );
+        };
+    }
+
+    // Super High Cumulonimbus Clouds & Distant Mega Painted Clouds
+    const HIGH_CLOUD_COUNT = LOW_GFX ? 0 : 28;
+    const highCloudGeo = buildProceduralCloud('tower');
+
+    const highCloudMat = new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: params.cloudsHighOpacity,
+        depthWrite: true,
+        depthTest: true,
+        side: THREE.FrontSide
+    });
+    setupToonCloudShader(highCloudMat, params.cloudsHighBottomBlur);
+
     const instHighClouds = new THREE.InstancedMesh(highCloudGeo, highCloudMat, HIGH_CLOUD_COUNT);
     instHighClouds.frustumCulled = false;
     scene.add(instHighClouds);
@@ -2563,42 +3106,205 @@ let isInitializingGui = true;
     instWispyClouds.frustumCulled = false;
     scene.add(instWispyClouds);
 
-    // Far-Distance Mega Painted Clouds (Visible when Kiki climbs high)
-    const MEGA_CLOUD_COUNT = LOW_GFX ? 0 : 24;
-    const megaCloudMat = new THREE.MeshToonMaterial({ color: 0xfff6e3, transparent: true, opacity: 0.88 });
-    const instMegaClouds = new THREE.InstancedMesh(highCloudGeo, megaCloudMat, MEGA_CLOUD_COUNT);
-    instMegaClouds.frustumCulled = false;
+    // Far-Distance Mega Painted Clouds (Horizon Cloud Banks)
+    const MEGA_CLOUD_COUNT = LOW_GFX ? 0 : 28;
+    const megaCloudMat = new THREE.MeshToonMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: params.cloudsGiantOpacity,
+        depthWrite: true,
+        depthTest: true,
+        side: THREE.FrontSide
+    });
+    setupToonCloudShader(megaCloudMat, params.cloudsGiantBottomBlur);
+
+    // 4 Distinct Procedural Cloud Archetypes for Horizon Banks:
+    // 0: Wide Shelf, 1: Cumulus Fortress, 2: Asymmetric Wind-Swept, 3: Undulating Double-Dome
+    const megaGeos = [
+        buildProceduralCloud('shelf'),
+        buildProceduralCloud('fortress'),
+        buildProceduralCloud('asymmetric'),
+        buildProceduralCloud('undulating')
+    ];
+    const MEGA_VARIANTS = megaGeos.length;
+    const MEGA_PER_VARIANT = Math.ceil(MEGA_CLOUD_COUNT / MEGA_VARIANTS); // 7 per variant = 28
+
+    const megaMeshes = [];
+    const instMegaClouds = new THREE.Group();
+    instMegaClouds.name = 'DistantHorizonBanksGroup';
+    instMegaClouds.visible = params.cloudsGiant;
     scene.add(instMegaClouds);
 
-    // Initialize all cloud instance matrices so they don't render a giant mass at origin (0,0,0)
+    megaGeos.forEach((geo, idx) => {
+        const m = new THREE.InstancedMesh(geo, megaCloudMat, MEGA_PER_VARIANT);
+        m.frustumCulled = false;
+        m.name = `MegaCloudVariant_${idx}`;
+        megaMeshes.push(m);
+        instMegaClouds.add(m);
+    });
+
+    // Altitude offsets (in meters) for gentle horizon immersion (-12m to +5m around horizon waterline)
+    const cloudAltitudeOffsets = [
+        -5, 0, -10, 5, -8, 0, -12, 4,
+        -6, 0, -10, 5, -8, 0, -12, 4,
+        -5, 0, -10, 5, -8, 0, -12, 4,
+        -6, 3, -8, 5
+    ];
+    const highAltitudeOffsets = [
+        -8, 4, -12, 0, -6, 5, -10, 0,
+        -8, 4, -12, 0, -6, 5, -10, 0,
+        -8, 4, -12, 0, -6, 5, -10, 0,
+        -7, 3, -11, 2
+    ];
+    const lowAltitudeOffsets = new Float32Array(CLOUD_COUNT);
+    for (let i = 0; i < CLOUD_COUNT; i++) {
+        lowAltitudeOffsets[i] = Math.random() * 100;
+    }
+
+    // Base scale tracking for instances to prevent decomposition drift and matrix flips
+    const cloudBaseScale = new Float32Array(CLOUD_COUNT * 3);
+    const highCloudBaseScale = new Float32Array(HIGH_CLOUD_COUNT * 3);
+    const megaCloudBaseScale = [];
+    for (let v = 0; v < MEGA_VARIANTS; v++) {
+        megaCloudBaseScale.push(new Float32Array(MEGA_PER_VARIANT * 3));
+    }
+
+    function setCloudSize(target, v) {
+        if (!target) return;
+        const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+        if (target === instClouds) {
+            const count = instClouds.instanceMatrix ? instClouds.instanceMatrix.count : instClouds.count;
+            for (let i = 0; i < count; i++) {
+                instClouds.getMatrixAt(i, m);
+                m.decompose(p, q, sc);
+                sc.set(cloudBaseScale[i * 3], cloudBaseScale[i * 3 + 1], cloudBaseScale[i * 3 + 2]).multiplyScalar(v);
+                m.compose(p, q, sc);
+                instClouds.setMatrixAt(i, m);
+            }
+            instClouds.instanceMatrix.needsUpdate = true;
+        } else if (target === instHighClouds) {
+            const count = instHighClouds.instanceMatrix ? instHighClouds.instanceMatrix.count : instHighClouds.count;
+            for (let i = 0; i < count; i++) {
+                instHighClouds.getMatrixAt(i, m);
+                m.decompose(p, q, sc);
+                sc.set(highCloudBaseScale[i * 3], highCloudBaseScale[i * 3 + 1], highCloudBaseScale[i * 3 + 2]).multiplyScalar(v);
+                m.compose(p, q, sc);
+                instHighClouds.setMatrixAt(i, m);
+            }
+            instHighClouds.instanceMatrix.needsUpdate = true;
+        } else if (target === instMegaClouds || target.isGroup) {
+            megaMeshes.forEach((mesh, vIdx) => {
+                const arr = megaCloudBaseScale[vIdx];
+                const count = mesh.instanceMatrix ? mesh.instanceMatrix.count : mesh.count;
+                for (let i = 0; i < count; i++) {
+                    mesh.getMatrixAt(i, m);
+                    m.decompose(p, q, sc);
+                    sc.set(arr[i * 3], arr[i * 3 + 1], arr[i * 3 + 2]).multiplyScalar(v);
+                    m.compose(p, q, sc);
+                    mesh.setMatrixAt(i, m);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+            });
+        }
+    }
+
+    function setCloudCount(target, v) {
+        if (!target) return;
+        if (target.isGroup) {
+            const total = Math.round(v);
+            const numVariants = target.children.length;
+            target.children.forEach((child, idx) => {
+                if (!child.instanceMatrix) return;
+                const max = child.instanceMatrix.count;
+                const countForThis = Math.floor(total / numVariants) + (idx < (total % numVariants) ? 1 : 0);
+                child.count = Math.min(countForThis, max);
+                child.visible = child.count > 0;
+                child.instanceMatrix.needsUpdate = true;
+            });
+        } else if (target.instanceMatrix) {
+            target.count = Math.min(Math.round(v), target.instanceMatrix.count);
+            target.instanceMatrix.needsUpdate = true;
+        }
+    }
+
+    // Initialize cloud instances distributed in an authentic 360-degree horizon panorama
     const dummyInit = new THREE.Object3D();
-    dummyInit.position.set(0, -1000, 0); // Force teleport on first frame!
-    dummyInit.scale.set(0, 0, 0);
-    dummyInit.updateMatrix();
-    for (let i = 0; i < CLOUD_COUNT; i++) instClouds.setMatrixAt(i, dummyInit.matrix);
-    for (let i = 0; i < HIGH_CLOUD_COUNT; i++) instHighClouds.setMatrixAt(i, dummyInit.matrix);
-    for (let i = 0; i < WISPY_CLOUD_COUNT; i++) instWispyClouds.setMatrixAt(i, dummyInit.matrix);
-    for (let i = 0; i < MEGA_CLOUD_COUNT; i++) instMegaClouds.setMatrixAt(i, dummyInit.matrix);
+    for (let i = 0; i < CLOUD_COUNT; i++) {
+        dummyInit.position.set(0, -9999, 0);
+        dummyInit.scale.set(0, 0, 0);
+        dummyInit.updateMatrix();
+        instClouds.setMatrixAt(i, dummyInit.matrix);
+        const s = 1.3 + Math.random() * 2.2;
+        cloudBaseScale[i * 3 + 0] = s * (0.8 + Math.random() * 0.8);
+        cloudBaseScale[i * 3 + 1] = s * (0.5 + Math.random() * 0.6);
+        cloudBaseScale[i * 3 + 2] = s * (0.8 + Math.random() * 0.8);
+    }
+    for (let i = 0; i < HIGH_CLOUD_COUNT; i++) {
+        // Golden angle distribution ensures any count (4, 6, 8, 12, 24) is evenly spaced 360 deg around horizon
+        const ang = (i * 2.399963) + (Math.random() - 0.5) * 0.15;
+        const r = (params.cloudsHighDistance || 3600) + (i % 3) * 200;
+        const altOffset = highAltitudeOffsets[i] || 0;
+        dummyInit.position.set(Math.cos(ang) * r, params.cloudsHighAltitude + altOffset, Math.sin(ang) * r);
+        const tangentAng = ang + Math.PI * 0.5 + (Math.random() - 0.5) * 0.4;
+        dummyInit.rotation.set(0, tangentAng + (i % 2 === 0 ? 0 : Math.PI), 0);
+        const s = 0.95 + (i % 4) * 0.1;
+        highCloudBaseScale[i * 3 + 0] = s;
+        highCloudBaseScale[i * 3 + 1] = s;
+        highCloudBaseScale[i * 3 + 2] = s;
+        dummyInit.scale.set(s, s, s).multiplyScalar(params.cloudsHighSize);
+        dummyInit.updateMatrix();
+        instHighClouds.setMatrixAt(i, dummyInit.matrix);
+    }
+    for (let i = 0; i < WISPY_CLOUD_COUNT; i++) {
+        dummyInit.position.set(0, -9999, 0);
+        dummyInit.scale.set(0, 0, 0);
+        dummyInit.updateMatrix();
+        instWispyClouds.setMatrixAt(i, dummyInit.matrix);
+    }
+    for (let i = 0; i < MEGA_CLOUD_COUNT; i++) {
+        const variantIdx = i % MEGA_VARIANTS;
+        const slotInVariant = Math.floor(i / MEGA_VARIANTS);
+        // Staggered golden angle offset from towers
+        const ang = (i * 2.399963 + 1.2) + (Math.random() - 0.5) * 0.15;
+        const baseDist = params.cloudsGiantDistance || 4200;
+        const depthLayer = (i % 2 === 0) ? (baseDist - 300) : (baseDist + 300);
+        const altOffset = cloudAltitudeOffsets[i] || 0;
+        dummyInit.position.set(Math.cos(ang) * depthLayer, params.cloudsGiantAltitude + altOffset, Math.sin(ang) * depthLayer);
+        const tangentAng = ang + Math.PI * 0.5 + (Math.random() - 0.5) * 0.3;
+        dummyInit.rotation.set(0, tangentAng + (i % 2 === 0 ? 0 : Math.PI), 0);
+        const s = 0.95 + (i % 3) * 0.1;
+        megaCloudBaseScale[variantIdx][slotInVariant * 3 + 0] = s * 1.15;
+        megaCloudBaseScale[variantIdx][slotInVariant * 3 + 1] = s;
+        megaCloudBaseScale[variantIdx][slotInVariant * 3 + 2] = s;
+        dummyInit.scale.set(s * 1.15, s, s).multiplyScalar(params.cloudsGiantSize);
+        dummyInit.updateMatrix();
+        megaMeshes[variantIdx].setMatrixAt(slotInVariant, dummyInit.matrix);
+    }
     instClouds.instanceMatrix.needsUpdate = true;
     instHighClouds.instanceMatrix.needsUpdate = true;
     instWispyClouds.instanceMatrix.needsUpdate = true;
-    instMegaClouds.instanceMatrix.needsUpdate = true;
+    megaMeshes.forEach(m => { m.instanceMatrix.needsUpdate = true; });
 
-    // Apply Pastel Colors to Clouds
-    let pastelColors = [0xffd1dc, 0xd1ffd1, 0xd1e8ff, 0xfffdd1, 0xe8d1ff];
-    const tempCloudColor = new THREE.Color();
+    // Pure harmonious white cloud color baseline
+    const tempCloudColor = new THREE.Color(0xffffff);
     for (let i = 0; i < CLOUD_COUNT; i++) {
-        if (Math.random() > 0.5) tempCloudColor.setHex(pastelColors[Math.floor(Math.random() * pastelColors.length)]);
-        else tempCloudColor.setHex(0xffffff);
         instClouds.setColorAt(i, tempCloudColor);
     }
     for (let i = 0; i < HIGH_CLOUD_COUNT; i++) {
-        if (Math.random() > 0.5) tempCloudColor.setHex(pastelColors[Math.floor(Math.random() * pastelColors.length)]);
-        else tempCloudColor.setHex(0xffffff);
         instHighClouds.setColorAt(i, tempCloudColor);
     }
+    megaMeshes.forEach(mesh => {
+        for (let i = 0; i < mesh.count; i++) {
+            mesh.setColorAt(i, tempCloudColor);
+        }
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    });
     if (instClouds.instanceColor) instClouds.instanceColor.needsUpdate = true;
     if (instHighClouds.instanceColor) instHighClouds.instanceColor.needsUpdate = true;
+
+    // Apply initial cloud count limits so horizon starts clean and majestic
+    setCloudCount(instHighClouds, params.cloudsHighCount);
+    setCloudCount(instMegaClouds, params.cloudsGiantCount);
 
     instFlowers.receiveShadow = false;
     instFlowers.castShadow = false;
@@ -2979,23 +3685,26 @@ let isInitializingGui = true;
 
         // Clouds
         const cloudScale = 1.0 + Math.min(1.0, Math.max(0.0, (playerGrp.position.y - 300.0) / 11700.0)) * 4.0;
-        const cloudDist = 1200 * cloudScale;
+        const cloudDist = (params.cloudsLowDistance || 1200) * cloudScale;
         const cloudTeleportDist = cloudDist * 1.15;
         for (let i = 0; i < CLOUD_COUNT; i++) {
             instClouds.getMatrixAt(i, dummy.matrix);
             dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
 
-            if (Math.abs(dummy.position.x - playerX) > cloudTeleportDist || Math.abs(dummy.position.z - playerZ) > cloudTeleportDist || dummy.position.y < -500) {
+            if (Math.abs(dummy.position.x - playerX) > cloudTeleportDist || Math.abs(dummy.position.z - playerZ) > cloudTeleportDist || dummy.position.y < -4000) {
                 const angle = Math.random() * Math.PI * 2.0;
                 const r = cloudDist * (0.6 + Math.random() * 0.38);
                 dummy.position.set(
                     playerX + Math.cos(angle) * r,
-                    150 + Math.random() * 100,
+                    params.cloudsLowAltitude + (lowAltitudeOffsets[i] || 0),
                     playerZ + Math.sin(angle) * r
                 );
                 dummy.rotation.set(0, Math.random() * Math.PI, 0);
-                let s = 1.3 + Math.random() * 2.2;
-                dummy.scale.set(s * (0.8 + Math.random() * 0.8), s * (0.5 + Math.random() * 0.6), s * (0.8 + Math.random() * 0.8));
+                dummy.scale.set(
+                    cloudBaseScale[i * 3 + 0],
+                    cloudBaseScale[i * 3 + 1],
+                    cloudBaseScale[i * 3 + 2]
+                ).multiplyScalar(params.cloudsLowSize);
             }
             dummy.position.x += 4.0 * dt;
             dummy.position.z += 1.5 * dt;
@@ -3004,41 +3713,51 @@ let isInitializingGui = true;
         }
         instClouds.instanceMatrix.needsUpdate = true;
 
-        // High Cumulonimbus Clouds
-        const highCloudDist = 3500;
-        const highCloudTeleport = highCloudDist * 1.15;
+        // Distant Ghibli Towering Cumulus Clouds
+        const highCloudDist = params.cloudsHighDistance || 3600;
+        const highCloudTeleport = highCloudDist * 1.22;
         for (let i = 0; i < HIGH_CLOUD_COUNT; i++) {
             instHighClouds.getMatrixAt(i, dummy.matrix);
-            dummy.position.setFromMatrixPosition(dummy.matrix);
-            if (Math.abs(dummy.position.x - playerX) > highCloudTeleport || Math.abs(dummy.position.z - playerZ) > highCloudTeleport || dummy.position.y < -500) {
+            dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+            const hdx = dummy.position.x - playerX;
+            const hdz = dummy.position.z - playerZ;
+            if (hdx * hdx + hdz * hdz > highCloudTeleport * highCloudTeleport || dummy.position.y < -500) {
                 const angle = Math.random() * Math.PI * 2.0;
-                const r = highCloudDist * (0.6 + Math.random() * 0.38);
+                const r = highCloudDist * (0.88 + Math.random() * 0.24);
+                const altOffset = (highAltitudeOffsets[i] !== undefined) ? highAltitudeOffsets[i] : 0;
                 dummy.position.set(
                     playerX + Math.cos(angle) * r,
-                    1200 + Math.random() * 500,
+                    params.cloudsHighAltitude + altOffset,
                     playerZ + Math.sin(angle) * r
                 );
-                dummy.rotation.set(0, Math.random() * Math.PI, 0);
-                dummy.scale.set(1.5 + Math.random() * 2.0, 0.8 + Math.random() * 1.0, 1.5 + Math.random() * 2.0);
+                const tangentAngle = angle + Math.PI * 0.5 + (Math.random() - 0.5) * 0.6;
+                dummy.rotation.set(0, tangentAngle + (Math.random() > 0.5 ? 0 : Math.PI), 0);
+                dummy.scale.set(
+                    highCloudBaseScale[i * 3 + 0],
+                    highCloudBaseScale[i * 3 + 1],
+                    highCloudBaseScale[i * 3 + 2]
+                ).multiplyScalar(params.cloudsHighSize);
             }
-            dummy.position.x += 1.5 * dt;
+            dummy.position.x += 1.0 * dt;
             dummy.updateMatrix();
             instHighClouds.setMatrixAt(i, dummy.matrix);
         }
         instHighClouds.instanceMatrix.needsUpdate = true;
 
         // See-Through Wispy Clouds
-        const wispyDist = 1400 * cloudScale;
+        const wispyDist = ((params.cloudsLowDistance || 1200) * 1.16) * cloudScale;
         const wispyTeleport = wispyDist * 1.15;
         for (let i = 0; i < WISPY_CLOUD_COUNT; i++) {
             instWispyClouds.getMatrixAt(i, dummy.matrix);
-            dummy.position.setFromMatrixPosition(dummy.matrix);
-            if (Math.abs(dummy.position.x - playerX) > wispyTeleport || Math.abs(dummy.position.z - playerZ) > wispyTeleport || dummy.position.y < -500) {
+            dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+            const wdx = dummy.position.x - playerX;
+            const wdz = dummy.position.z - playerZ;
+            if (wdx * wdx + wdz * wdz > wispyTeleport * wispyTeleport || dummy.position.y < -4000) {
                 const angle = Math.random() * Math.PI * 2.0;
                 const r = wispyDist * (0.6 + Math.random() * 0.38);
                 dummy.position.set(
                     playerX + Math.cos(angle) * r,
-                    100 + Math.random() * 160,
+                    (params.cloudsLowAltitude - 40) + Math.random() * 120,
                     playerZ + Math.sin(angle) * r
                 );
                 dummy.rotation.set(0, Math.random() * Math.PI, 0);
@@ -3050,28 +3769,39 @@ let isInitializingGui = true;
         }
         instWispyClouds.instanceMatrix.needsUpdate = true;
 
-        // Distant Mega Painted Clouds (Hovering at max altitude horizon)
-        const megaDist = 3800;
-        const megaTeleport = megaDist * 1.15;
-        for (let i = 0; i < MEGA_CLOUD_COUNT; i++) {
-            instMegaClouds.getMatrixAt(i, dummy.matrix);
-            dummy.position.setFromMatrixPosition(dummy.matrix);
-            if (Math.abs(dummy.position.x - playerX) > megaTeleport || Math.abs(dummy.position.z - playerZ) > megaTeleport || dummy.position.y < -500) {
-                const ang = Math.random() * Math.PI * 2.0;
-                const r = megaDist * (0.6 + Math.random() * 0.38);
-                dummy.position.set(
-                    playerX + Math.cos(ang) * r,
-                    450 + Math.random() * 400,
-                    playerZ + Math.sin(ang) * r
-                );
-                dummy.rotation.set(0, Math.random() * Math.PI, 0);
-                dummy.scale.set(3.0 + Math.random() * 2.5, 1.4 + Math.random() * 1.2, 3.0 + Math.random() * 2.5);
+        // Distant Ghibli Horizon Cloud Banks (4 Varied Archetypes)
+        const megaDist = params.cloudsGiantDistance || 4200;
+        const megaTeleport = megaDist * 1.25;
+        megaMeshes.forEach((mesh, vIdx) => {
+            for (let i = 0; i < mesh.count; i++) {
+                mesh.getMatrixAt(i, dummy.matrix);
+                dummy.matrix.decompose(dummy.position, dummy.quaternion, dummy.scale);
+                const mdx = dummy.position.x - playerX;
+                const mdz = dummy.position.z - playerZ;
+                if (mdx * mdx + mdz * mdz > megaTeleport * megaTeleport || dummy.position.y < -500) {
+                    const ang = Math.random() * Math.PI * 2.0;
+                    const r = (i % 2 === 0) ? (megaDist * 0.92 + Math.random() * 300) : (megaDist * 1.08 + Math.random() * 300);
+                    const cloudIdx = vIdx * MEGA_PER_VARIANT + i;
+                    const altOffset = (cloudAltitudeOffsets[cloudIdx] !== undefined) ? cloudAltitudeOffsets[cloudIdx] : 0;
+                    dummy.position.set(
+                        playerX + Math.cos(ang) * r,
+                        params.cloudsGiantAltitude + altOffset,
+                        playerZ + Math.sin(ang) * r
+                    );
+                    const tangentAngle = ang + Math.PI * 0.5 + (Math.random() - 0.5) * 0.5;
+                    dummy.rotation.set(0, tangentAngle + (Math.random() > 0.5 ? 0 : Math.PI), 0);
+                    dummy.scale.set(
+                        megaCloudBaseScale[vIdx][i * 3 + 0],
+                        megaCloudBaseScale[vIdx][i * 3 + 1],
+                        megaCloudBaseScale[vIdx][i * 3 + 2]
+                    ).multiplyScalar(params.cloudsGiantSize);
+                }
+                dummy.position.x += 0.6 * dt;
+                dummy.updateMatrix();
+                mesh.setMatrixAt(i, dummy.matrix);
             }
-            dummy.position.x += 0.8 * dt;
-            dummy.updateMatrix();
-            instMegaClouds.setMatrixAt(i, dummy.matrix);
-        }
-        instMegaClouds.instanceMatrix.needsUpdate = true;
+            mesh.instanceMatrix.needsUpdate = true;
+        });
 
         if (shouldUpdateTerrain) {
             // Trees: Hierarchical Octree Spatial Partitioning & Frustum Culling
@@ -3370,76 +4100,8 @@ let isInitializingGui = true;
     }, undefined, (err) => console.warn("Could not load Pine_1_ultra_fast.glb:", err));
 
 
-    gltfLoader.load(
-        'kiki-lowpoly.glb',
-        (gltf) => {
-            kikiModel = gltf.scene;
-            const box = new THREE.Box3().setFromObject(kikiModel);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            const center = new THREE.Vector3();
-            box.getCenter(center);
-
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const targetScale = maxDim > 0 ? (2.0 / maxDim) : 1.0;
-            kikiModel.scale.set(targetScale, targetScale, targetScale);
-
-            kikiModel.position.x = -center.x * targetScale;
-            kikiModel.position.y = -center.y * targetScale;
-            kikiModel.position.z = -center.z * targetScale;
-
-            kikiModel.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-            kikiModel.rotation.y = Math.PI;
-            proxyMesh.visible = false;
-            kikiModel.visible = (currentCharacter === 'kiki');
-            playerVisuals.add(kikiModel);
-        },
-        undefined,
-        (err) => console.warn("Could not load kiki-lowpoly.glb:", err)
-    );
-
-    // Load Princess on a Whale GLTF Model
-    gltfLoader.load(
-        'Princess.glb',
-        (gltf) => {
-            whaleModel = gltf.scene;
-            const box = new THREE.Box3().setFromObject(whaleModel);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-            const center = new THREE.Vector3();
-            box.getCenter(center);
-
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const targetScale = maxDim > 0 ? (6.0 / maxDim) : 1.0;
-            whaleModel.scale.set(targetScale, targetScale, targetScale);
-
-            whaleModel.position.x = -center.x * targetScale;
-            whaleModel.position.y = -center.y * targetScale;
-            whaleModel.position.z = -center.z * targetScale;
-
-            whaleModel.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                }
-            });
-            whaleModel.rotation.y = Math.PI;
-            whaleModel.visible = (currentCharacter === 'whale');
-            playerVisuals.add(whaleModel);
-
-            if (gltf.animations && gltf.animations.length > 0) {
-                whaleMixer = new THREE.AnimationMixer(whaleModel);
-                whaleMixer.clipAction(gltf.animations[0]).play();
-            }
-        },
-        undefined,
-        (err) => console.warn("Could not load Princess.glb:", err)
-    );
+    // Load default flight model (Kiki) — others lazy-load on demand
+    _fmLoadAndActivate(0);
 
 
 
@@ -3697,6 +4359,12 @@ let isInitializingGui = true;
     let currentPitch = 0;
     let currentRoll = 0;
     let turnVelocity = 0;
+    window.setFlightHeading = (y) => {
+        currentYaw = y;
+        turnVelocity = 0;
+        if (typeof playerGrp !== 'undefined') playerGrp.rotation.set(0, y, 0, 'YXZ');
+        if (typeof cameraBase !== 'undefined') cameraBase.quaternion.setFromEuler(new THREE.Euler(0, y, 0, 'YXZ'));
+    };
 
     const targetQuaternion = new THREE.Quaternion();
     const eulerRotation = new THREE.Euler(0, 0, 0, 'YXZ');
@@ -3710,6 +4378,7 @@ let isInitializingGui = true;
     const _scratchAmbColor = new THREE.Color();
     const _scratchDirColor = new THREE.Color();
     const _scratchCloudColor = new THREE.Color();
+    const _scratchCloudTint = new THREE.Color();
     const _scratchSunForward = new THREE.Vector3();
     const _scratchMoonOffset = new THREE.Vector3();
     const _scratchAxisY = new THREE.Vector3(0, 1, 0);
@@ -4073,16 +4742,30 @@ let isInitializingGui = true;
         }
         camera.updateProjectionMatrix();
 
-        // Keep the physical sun and flare exactly 20,000 units away directly in front of the player's flight path
-        currentSunY += (target.sunY - currentSunY) * dt * 2.0;
+        // Update Sun & Celestial positioning from active environment config or GUI parameter (Wanderlust-II)
+        const targetSunY = (params.sunAltitude !== undefined && params.sunAltitude !== null) ? params.sunAltitude : target.sunY;
+        currentSunY += (targetSunY - currentSunY) * dt * 2.0;
         currentMoonY += (target.moonY - currentMoonY) * dt * 2.0;
 
-        _scratchSunForward.set(0, 0, -20000);
-        _scratchSunForward.applyQuaternion(playerGrp.quaternion);
+        const azimuthRad = THREE.MathUtils.degToRad(params.sunAzimuth !== undefined ? params.sunAzimuth : 0);
+        const sunDist = 20000;
+        _scratchSunForward.set(
+            Math.sin(azimuthRad) * sunDist,
+            0,
+            -Math.cos(azimuthRad) * sunDist
+        );
+        if (params.lockSunToPlayer !== false) {
+            _scratchSunForward.applyQuaternion(playerGrp.quaternion);
+        }
 
         // Sun positioning & visibility (hidden at Night to prevent 2nd sun artifact)
         staticSun.position.copy(playerGrp.position).add(_scratchSunForward);
-        staticSun.position.y = playerGrp.position.y * 0.45 + currentSunY;
+        staticSun.position.y = (params.sunAltitude !== undefined && params.sunAltitude !== null)
+            ? (playerGrp.position.y * 0.45 + params.sunAltitude)
+            : (playerGrp.position.y * 0.45 + currentSunY);
+        if (params.sunDiscScale && staticSun.scale.x !== params.sunDiscScale) {
+            staticSun.scale.setScalar(params.sunDiscScale);
+        }
         staticSun.visible = (timePhase !== 2);
 
         // Moon positioning (rises high into the sky in Night/Twilight phase)
@@ -4098,10 +4781,43 @@ let isInitializingGui = true;
         dirLight.target.position.copy(playerGrp.position);
         dirLight.target.updateMatrixWorld();
 
+        if (window.cloudShaderUniformsList) {
+            window.cloudShaderUniformsList.forEach(u => {
+                if (!u) return;
+                if (u.uSunDir) u.uSunDir.value.copy(_scratchToLight);
+                if (u.uHorizonColor) u.uHorizonColor.value.copy(scene.fog ? scene.fog.color : _scratchFogColor.set(target.skyHorizon));
+                if (u.uSunLitColor) {
+                    if (timePhase === 0) u.uSunLitColor.value.lerp(_scratchCloudColor.set(params.cloudsDayLitColor || '#fffdf6'), dt * 2);
+                    else if (timePhase === 1) u.uSunLitColor.value.lerp(_scratchCloudColor.set(0xffd5a0), dt * 2);
+                    else u.uSunLitColor.value.lerp(_scratchCloudColor.set(params.cloudsNightLitColor || '#9ec7eb'), dt * 2);
+                }
+                if (u.uSkyShadowColor) {
+                    if (timePhase === 0) u.uSkyShadowColor.value.lerp(_scratchCloudColor.set(params.cloudsDayShadowColor || '#9cb8db'), dt * 2);
+                    else if (timePhase === 1) u.uSkyShadowColor.value.lerp(_scratchCloudColor.set(0x8a7098), dt * 2);
+                    else u.uSkyShadowColor.value.lerp(_scratchCloudColor.set(params.cloudsNightShadowColor || '#1a3055'), dt * 2);
+                }
+            });
+        }
+
         // Cloud colors lerping (tints clouds to match day / dusk / night dark blue sky)
-        if (typeof matCloud !== 'undefined') matCloud.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
-        if (typeof highCloudMat !== 'undefined') highCloudMat.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
-        if (typeof megaCloudMat !== 'undefined') megaCloudMat.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
+        if (typeof matCloud !== 'undefined') {
+            matCloud.color.lerp(_scratchCloudColor.set(target.cloudCol).multiply(_scratchCloudTint.set(params.cloudsLowColor)), dt * 2);
+            if (matCloud.userData && matCloud.userData.shader && matCloud.userData.shader.uniforms.uCloudTint) {
+                matCloud.userData.shader.uniforms.uCloudTint.value.set(params.cloudsLowColor);
+            }
+        }
+        if (typeof highCloudMat !== 'undefined') {
+            highCloudMat.color.lerp(_scratchCloudColor.set(target.cloudCol).multiply(_scratchCloudTint.set(params.cloudsHighColor)), dt * 2);
+            if (highCloudMat.userData && highCloudMat.userData.shader && highCloudMat.userData.shader.uniforms.uCloudTint) {
+                highCloudMat.userData.shader.uniforms.uCloudTint.value.set(params.cloudsHighColor);
+            }
+        }
+        if (typeof megaCloudMat !== 'undefined') {
+            megaCloudMat.color.lerp(_scratchCloudColor.set(target.cloudCol).multiply(_scratchCloudTint.set(params.cloudsGiantColor)), dt * 2);
+            if (megaCloudMat.userData && megaCloudMat.userData.shader && megaCloudMat.userData.shader.uniforms.uCloudTint) {
+                megaCloudMat.userData.shader.uniforms.uCloudTint.value.set(params.cloudsGiantColor);
+            }
+        }
         if (typeof matWispyCloud !== 'undefined') matWispyCloud.color.lerp(_scratchCloudColor.set(target.cloudCol), dt * 2);
 
         // Dynamically scale up the terrain and water as Kiki flies high
@@ -4139,6 +4855,7 @@ let isInitializingGui = true;
         if (typeof updateCapybaras === 'function') {
             updateCapybaras(playerGrp.position, dt, time);
         }
+        if (fmCurrentMixer) fmCurrentMixer.update(dt);
 
         if (isWindTrailsOn && isWindOn) {
             instTrails.visible = true;
@@ -4582,9 +5299,13 @@ let isInitializingGui = true;
             atmoParams.ambI = cur.ambI;
             atmoParams.dirI = cur.dirI;
             atmoParams.glintCol = '#' + cur.glintCol.toString(16).padStart(6, '0');
+            params.sunAltitude = cur.sunY;
             // Refresh GUI display without triggering onChange
             if (atmoFolder) {
                 atmoFolder.controllersRecursive().forEach(c => c.updateDisplay());
+            }
+            if (window.sunGodRaysFolder) {
+                window.sunGodRaysFolder.controllersRecursive().forEach(c => c.updateDisplay());
             }
         }
 
@@ -4669,51 +5390,229 @@ let isInitializingGui = true;
             kikiRightLight.color.copy(col);
         });
 
-        // Cloud Editor
-        const cloudParams = {
-            c0: '#' + pastelColors[0].toString(16).padStart(6, '0'),
-            c1: '#' + pastelColors[1].toString(16).padStart(6, '0'),
-            c2: '#' + pastelColors[2].toString(16).padStart(6, '0'),
-            c3: '#' + pastelColors[3].toString(16).padStart(6, '0'),
-            c4: '#' + pastelColors[4].toString(16).padStart(6, '0'),
-            opBase: matCloud.opacity,
-            opHigh: highCloudMat.opacity,
-            opWispy: matWispyCloud.opacity,
-            opMega: megaCloudMat.opacity
-        };
-
-        let oldCloudColors = [...pastelColors];
-        function updateCloudColorForIndex(idx, newHex) {
-            const oldHex = oldCloudColors[idx];
-            const newHexVal = parseInt(newHex.replace('#',''), 16);
-            if (oldHex === newHexVal) return;
-            pastelColors[idx] = newHexVal;
-            const oldColor = new THREE.Color(oldHex);
-            const newColor = new THREE.Color(newHexVal);
-            const temp = new THREE.Color();
-
-            [instClouds, instHighClouds].forEach(mesh => {
-                for (let i = 0; i < mesh.count; i++) {
-                    mesh.getColorAt(i, temp);
-                    if (Math.abs(temp.r - oldColor.r) < 0.01 && Math.abs(temp.g - oldColor.g) < 0.01 && Math.abs(temp.b - oldColor.b) < 0.01) {
-                        mesh.setColorAt(i, newColor);
+        // =========================================================================
+        // UNIFIED CLOUDS SECTION (All Low & Distant Cloud Options Combined)
+        // =========================================================================
+        let lastCloudDistance = params.cloudsLowDistance;
+        function updateLowCloudDistance(newDist) {
+            if (!lastCloudDistance || lastCloudDistance === newDist) {
+                lastCloudDistance = newDist;
+                return;
+            }
+            const ratio = newDist / lastCloudDistance;
+            lastCloudDistance = newDist;
+            const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+            const px = typeof playerGrp !== 'undefined' ? playerGrp.position.x : 0;
+            const pz = typeof playerGrp !== 'undefined' ? playerGrp.position.z : 0;
+            const totalCloudSlots = (instClouds.instanceMatrix ? instClouds.instanceMatrix.count : instClouds.count);
+            for (let i = 0; i < totalCloudSlots; i++) {
+                instClouds.getMatrixAt(i, m);
+                m.decompose(p, q, sc);
+                if (p.y > -4000) {
+                    p.x = px + (p.x - px) * ratio;
+                    p.z = pz + (p.z - pz) * ratio;
+                    m.compose(p, q, sc);
+                    instClouds.setMatrixAt(i, m);
+                }
+            }
+            instClouds.instanceMatrix.needsUpdate = true;
+            if (typeof instWispyClouds !== 'undefined') {
+                const totalWispySlots = (instWispyClouds.instanceMatrix ? instWispyClouds.instanceMatrix.count : instWispyClouds.count);
+                for (let i = 0; i < totalWispySlots; i++) {
+                    instWispyClouds.getMatrixAt(i, m);
+                    m.decompose(p, q, sc);
+                    if (p.y > -4000) {
+                        p.x = px + (p.x - px) * ratio;
+                        p.z = pz + (p.z - pz) * ratio;
+                        m.compose(p, q, sc);
+                        instWispyClouds.setMatrixAt(i, m);
                     }
                 }
-                if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-            });
-            oldCloudColors[idx] = newHexVal;
+                instWispyClouds.instanceMatrix.needsUpdate = true;
+            }
         }
 
-        const cloudFolder = gui.addFolder('Cloud Editor');
-        cloudFolder.addColor(cloudParams, 'c0').name('Color 1').onChange(v => updateCloudColorForIndex(0, v));
-        cloudFolder.addColor(cloudParams, 'c1').name('Color 2').onChange(v => updateCloudColorForIndex(1, v));
-        cloudFolder.addColor(cloudParams, 'c2').name('Color 3').onChange(v => updateCloudColorForIndex(2, v));
-        cloudFolder.addColor(cloudParams, 'c3').name('Color 4').onChange(v => updateCloudColorForIndex(3, v));
-        cloudFolder.addColor(cloudParams, 'c4').name('Color 5').onChange(v => updateCloudColorForIndex(4, v));
-        cloudFolder.add(cloudParams, 'opBase', 0, 1).name('Base Opacity').onChange(v => matCloud.opacity = v);
-        cloudFolder.add(cloudParams, 'opHigh', 0, 1).name('High Opacity').onChange(v => highCloudMat.opacity = v);
-        cloudFolder.add(cloudParams, 'opWispy', 0, 1).name('Wispy Opacity').onChange(v => matWispyCloud.opacity = v);
-        cloudFolder.add(cloudParams, 'opMega', 0, 1).name('Mega Opacity').onChange(v => megaCloudMat.opacity = v);
+        function updateLowCloudAltitude(newAlt) {
+            const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+            const totalCloudSlots = (instClouds.instanceMatrix ? instClouds.instanceMatrix.count : instClouds.count);
+            for (let i = 0; i < totalCloudSlots; i++) {
+                instClouds.getMatrixAt(i, m);
+                m.decompose(p, q, sc);
+                if (p.y > -4000) {
+                    p.y = newAlt + (lowAltitudeOffsets[i] || 0);
+                    m.compose(p, q, sc);
+                    instClouds.setMatrixAt(i, m);
+                }
+            }
+            instClouds.instanceMatrix.needsUpdate = true;
+            if (typeof instWispyClouds !== 'undefined') {
+                const totalWispySlots = (instWispyClouds.instanceMatrix ? instWispyClouds.instanceMatrix.count : instWispyClouds.count);
+                for (let i = 0; i < totalWispySlots; i++) {
+                    instWispyClouds.getMatrixAt(i, m);
+                    m.decompose(p, q, sc);
+                    if (p.y > -4000) {
+                        p.y = (newAlt - 40) + (lowAltitudeOffsets[i % CLOUD_COUNT] || 0);
+                        m.compose(p, q, sc);
+                        instWispyClouds.setMatrixAt(i, m);
+                    }
+                }
+                instWispyClouds.instanceMatrix.needsUpdate = true;
+            }
+        }
+
+        let lastHighCloudDistance = params.cloudsHighDistance || 3600;
+        function updateHighCloudDistance(newDist) {
+            if (!lastHighCloudDistance || lastHighCloudDistance === newDist) {
+                lastHighCloudDistance = newDist;
+                return;
+            }
+            const ratio = newDist / lastHighCloudDistance;
+            lastHighCloudDistance = newDist;
+            const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+            const px = typeof playerGrp !== 'undefined' ? playerGrp.position.x : 0;
+            const pz = typeof playerGrp !== 'undefined' ? playerGrp.position.z : 0;
+            const totalSlots = (instHighClouds.instanceMatrix ? instHighClouds.instanceMatrix.count : instHighClouds.count);
+            for (let i = 0; i < totalSlots; i++) {
+                instHighClouds.getMatrixAt(i, m);
+                m.decompose(p, q, sc);
+                p.x = px + (p.x - px) * ratio;
+                p.z = pz + (p.z - pz) * ratio;
+                m.compose(p, q, sc);
+                instHighClouds.setMatrixAt(i, m);
+            }
+            instHighClouds.instanceMatrix.needsUpdate = true;
+        }
+
+        let lastGiantCloudDistance = params.cloudsGiantDistance || 4200;
+        function updateGiantCloudDistance(newDist) {
+            if (!lastGiantCloudDistance || lastGiantCloudDistance === newDist) {
+                lastGiantCloudDistance = newDist;
+                return;
+            }
+            const ratio = newDist / lastGiantCloudDistance;
+            lastGiantCloudDistance = newDist;
+            const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+            const px = typeof playerGrp !== 'undefined' ? playerGrp.position.x : 0;
+            const pz = typeof playerGrp !== 'undefined' ? playerGrp.position.z : 0;
+            megaMeshes.forEach(mesh => {
+                const totalSlots = (mesh.instanceMatrix ? mesh.instanceMatrix.count : mesh.count);
+                for (let i = 0; i < totalSlots; i++) {
+                    mesh.getMatrixAt(i, m);
+                    m.decompose(p, q, sc);
+                    p.x = px + (p.x - px) * ratio;
+                    p.z = pz + (p.z - pz) * ratio;
+                    m.compose(p, q, sc);
+                    mesh.setMatrixAt(i, m);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+            });
+        }
+
+        const cloudFolder = gui.addFolder('☁️ Clouds');
+
+        // Master height & distance controls (meaning from ground, with negative option)
+        cloudFolder.add(params, 'cloudsLowAltitude', -300, 2000, 5).name('Overall Height (from Ground)').onChange(v => {
+            updateLowCloudAltitude(v);
+        }).listen();
+        cloudFolder.add(params, 'cloudsLowDistance', 100, 4000, 25).name('Distance from Camera / Model').onChange(v => {
+            updateLowCloudDistance(v);
+        }).listen();
+
+        // 1. Low Nearby Clouds
+        const lowFolder = cloudFolder.addFolder('Low Clouds (Nearby)');
+        lowFolder.add(params, 'cloudsLow').name('Show Low Clouds').onChange(v => { instClouds.visible = v; });
+        lowFolder.add(params, 'cloudsLowCount', 0, 150, 1).name('How Many').onChange(v => setCloudCount(instClouds, v));
+        lowFolder.add(params, 'cloudsLowSize', 0.2, 3, 0.05).name('Scale / Size').onChange(v => setCloudSize(instClouds, v));
+        lowFolder.add(params, 'cloudsLowAltitude', -300, 2000, 5).name('Height (from Ground)').onChange(v => {
+            updateLowCloudAltitude(v);
+        }).listen();
+        lowFolder.add(params, 'cloudsLowDistance', 100, 4000, 25).name('Distance from Camera').onChange(v => {
+            updateLowCloudDistance(v);
+        }).listen();
+        lowFolder.add(params, 'cloudsLowOpacity', 0.1, 1.0, 0.02).name('Opacity').onChange(v => {
+            matCloud.opacity = v;
+            if (matCloud.userData.shader) matCloud.userData.shader.uniforms.uCloudOpacity.value = v;
+        });
+        lowFolder.add(params, 'cloudsLowBottomBlur', 0.0, 0.9, 0.01).name('Bottom Blur / Feather').onChange(v => {
+            if (matCloud.userData.shader) matCloud.userData.shader.uniforms.uBottomBlur.value = v;
+        });
+        lowFolder.addColor(params, 'cloudsLowColor').name('Color Tint');
+
+        // 2. Distant Cumulus Towers
+        const highFolder = cloudFolder.addFolder('Distant Cumulus Towers');
+        highFolder.add(params, 'cloudsHigh').name('Show Towers').onChange(v => { instHighClouds.visible = v; });
+        highFolder.add(params, 'cloudsHighCount', 0, 28, 1).name('How Many').onChange(v => setCloudCount(instHighClouds, v));
+        highFolder.add(params, 'cloudsHighSize', 0.2, 3, 0.05).name('Scale / Size').onChange(v => setCloudSize(instHighClouds, v));
+        highFolder.add(params, 'cloudsHighAltitude', -500, 500, 2).name('Altitude / Height').onChange(v => {
+            const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+            const totalSlots = instHighClouds.instanceMatrix ? instHighClouds.instanceMatrix.count : instHighClouds.count;
+            for (let i = 0; i < totalSlots; i++) {
+                instHighClouds.getMatrixAt(i, m);
+                m.decompose(p, q, sc);
+                p.y = v + (highAltitudeOffsets[i] || 0);
+                m.compose(p, q, sc);
+                instHighClouds.setMatrixAt(i, m);
+            }
+            instHighClouds.instanceMatrix.needsUpdate = true;
+        });
+        highFolder.add(params, 'cloudsHighDistance', 800, 8000, 25).name('Distance from Camera').onChange(v => {
+            updateHighCloudDistance(v);
+        }).listen();
+        highFolder.add(params, 'cloudsHighOpacity', 0.1, 1.0, 0.02).name('Opacity').onChange(v => {
+            highCloudMat.opacity = v;
+            if (highCloudMat.userData && highCloudMat.userData.shader && highCloudMat.userData.shader.uniforms.uCloudOpacity) {
+                highCloudMat.userData.shader.uniforms.uCloudOpacity.value = v;
+            }
+        });
+        highFolder.add(params, 'cloudsHighBottomBlur', 0.05, 0.8, 0.02).name('Bottom Blur / Feather').onChange(v => {
+            if (highCloudMat.userData && highCloudMat.userData.shader && highCloudMat.userData.shader.uniforms.uBottomBlur) {
+                highCloudMat.userData.shader.uniforms.uBottomBlur.value = v;
+            }
+        });
+        highFolder.addColor(params, 'cloudsHighColor').name('Color Tint');
+
+        // 3. Distant Horizon Banks
+        const giantFolder = cloudFolder.addFolder('Distant Horizon Banks');
+        giantFolder.add(params, 'cloudsGiant').name('Show Horizon Banks').onChange(v => { instMegaClouds.visible = v; });
+        giantFolder.add(params, 'cloudsGiantCount', 0, 28, 1).name('How Many').onChange(v => setCloudCount(instMegaClouds, v));
+        giantFolder.add(params, 'cloudsGiantSize', 0.2, 3, 0.05).name('Scale / Size').onChange(v => setCloudSize(instMegaClouds, v));
+        giantFolder.add(params, 'cloudsGiantAltitude', -500, 500, 2).name('Altitude / Height').onChange(v => {
+            const m = new THREE.Matrix4(), p = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
+            megaMeshes.forEach((mesh, vIdx) => {
+                const totalSlots = mesh.instanceMatrix ? mesh.instanceMatrix.count : mesh.count;
+                for (let i = 0; i < totalSlots; i++) {
+                    mesh.getMatrixAt(i, m);
+                    m.decompose(p, q, sc);
+                    const cloudIdx = vIdx * MEGA_PER_VARIANT + i;
+                    p.y = v + (cloudAltitudeOffsets[cloudIdx] || 0);
+                    m.compose(p, q, sc);
+                    mesh.setMatrixAt(i, m);
+                }
+                mesh.instanceMatrix.needsUpdate = true;
+            });
+        });
+        giantFolder.add(params, 'cloudsGiantDistance', 1000, 10000, 25).name('Distance from Camera').onChange(v => {
+            updateGiantCloudDistance(v);
+        }).listen();
+        giantFolder.add(params, 'cloudsGiantOpacity', 0.1, 1.0, 0.02).name('Opacity').onChange(v => {
+            megaCloudMat.opacity = v;
+            if (megaCloudMat.userData && megaCloudMat.userData.shader && megaCloudMat.userData.shader.uniforms.uCloudOpacity) {
+                megaCloudMat.userData.shader.uniforms.uCloudOpacity.value = v;
+            }
+        });
+        giantFolder.add(params, 'cloudsGiantBottomBlur', 0.05, 0.8, 0.02).name('Bottom Blur / Feather').onChange(v => {
+            if (megaCloudMat.userData && megaCloudMat.userData.shader && megaCloudMat.userData.shader.uniforms.uBottomBlur) {
+                megaCloudMat.userData.shader.uniforms.uBottomBlur.value = v;
+            }
+        });
+        giantFolder.addColor(params, 'cloudsGiantColor').name('Color Tint');
+
+        // 4. Lighting & Ghibli Shading Colors
+        const lightFolder = cloudFolder.addFolder('Lighting & Shading');
+        lightFolder.addColor(params, 'cloudsDayLitColor').name('Day Sunlit Tops');
+        lightFolder.addColor(params, 'cloudsDayShadowColor').name('Day Sky Shadows');
+        lightFolder.addColor(params, 'cloudsNightLitColor').name('Night Moonlit Tops');
+        lightFolder.addColor(params, 'cloudsNightShadowColor').name('Night Sky Shadows');
 
         // Tree Editor
         let oldTreeColors = [...treeGreenVariations];

@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Ghibli Flight",
+  "description": "High-performance procedural flight simulator with rich biomes, dynamic terrain, vegetation, volumetric clouds, and sun god rays.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -6,47 +6,29 @@ const colorMountainGrass= new THREE.Color(0x4b7043);
 const colorMountainRock = new THREE.Color(0x5a5e6b);
 const colorSnow         = new THREE.Color(0xf5f6fa);
 
-// Centered inside Misty Mountains II zone (104,000m to 134,000m)
-const CHAIN_CENTER_Z = 119000;
-const CHAIN_ANGLE = Math.PI / 5.5; // ~32.7° diagonal spine
-const _cosA = Math.cos(CHAIN_ANGLE);
-const _sinA = Math.sin(CHAIN_ANGLE);
-
-// Domain rotation to break grid-aligned saw-tooth cross patterns
-const cosR = 0.8660254; // cos(30 deg)
-const sinR = 0.5;       // sin(30 deg)
-
 export default {
     name: "🏔️ Misty Mountains II",
     shoreName: "░ Mountain Shore II",
     getHeight(x, z, snoise) {
-        const perpDist   = x * _cosA - (z - CHAIN_CENTER_Z) * _sinA;
-        const alongChain = x * _sinA + (z - CHAIN_CENTER_Z) * _cosA;
+        // Multi-octave domain-warped alpine range
+        const wx = x + snoise(x * 0.00065 + 73.1, z * 0.00065 + 19.4) * 480.0;
+        const wz = z + snoise(x * 0.00065 - 41.8, z * 0.00065 + 88.2) * 480.0;
 
-        const spineW = 1100;
-        const spineT = Math.max(0.0, 1.0 - (perpDist / spineW) * (perpDist / spineW));
-        const spineFactor = spineT * spineT;
+        const n1 = snoise(wx * 0.0005, wz * 0.0005);
+        const n2 = snoise(wx * 0.0013 + 120.0, wz * 0.0013 - 120.0);
+        const n3 = snoise(x * 0.004 + 250.0, z * 0.004 + 250.0);
+        const n4 = snoise(x * 0.012, z * 0.012);
 
-        // Rotate alongChain and perpDist coordinates to eliminate grid cross patterns
-        const rx = alongChain * cosR - perpDist * sinR;
-        const rz = alongChain * sinR + perpDist * cosR;
+        const massif = Math.pow(Math.max(0, n1 * 0.65 + n2 * 0.35 + 0.38), 1.85) * 190.0;
+        const ridges = Math.pow(Math.max(0, snoise(wx * 0.001 + 330, wz * 0.001 + 330)), 2.0) * 55.0;
+        const detail = n3 * 16.0 + n4 * 5.0;
 
-        const n1 = snoise(rx * 0.00075 + 50.0, rz * 0.00075 + 50.0);
-        let ridge = 1.0 - Math.abs(n1);
-        ridge = ridge * ridge * (3.0 - 2.0 * ridge); // Smoothstep curve for natural organic peaks
-
-        const n2 = snoise(x * 0.003 + 50, z * 0.003 + 50);
-        const n3 = snoise(x * 0.009 + 50, z * 0.009 + 50);
-
-        const foothills = Math.max(8.0, snoise(x * 0.0015 + 50, z * 0.0015 + 50) * 32.0 + 18.0);
-        const peaks = ridge * 210.0 * spineFactor + n2 * 18.0 + n3 * 6.0;
-
-        return Math.max(6.0, foothills + peaks);
+        return Math.max(3.0, massif + ridges + detail + 10.0);
     },
     getColor(h, x, z, snoise, tempColor, smoothstep) {
-        const nNoise = snoise(x * 0.01 + 50, z * 0.01 + 50) * 6.0;
-        const snowStart = 55.0 + nNoise;
-        const snowFull = 110.0 + nNoise;
+        const nNoise = snoise(x * 0.008 + 50, z * 0.008 + 50) * 6.0;
+        const snowStart = 65.0 + nNoise;
+        const snowFull = 120.0 + nNoise;
 
         if (h < 1.0) {
             tempColor.copy(colorDeepWater);
@@ -54,10 +36,10 @@ export default {
             tempColor.lerpColors(colorDeepWater, colorSand, smoothstep(1.0, 2.35, h));
         } else if (h < 4.2) {
             tempColor.copy(colorSand);
-        } else if (h < 15.0) {
-            tempColor.lerpColors(colorSand, colorMountainGrass, smoothstep(4.2, 15.0, h));
+        } else if (h < 18.0) {
+            tempColor.lerpColors(colorSand, colorMountainGrass, smoothstep(4.2, 18.0, h));
         } else if (h < snowStart) {
-            tempColor.lerpColors(colorMountainGrass, colorMountainRock, smoothstep(15.0, snowStart, h));
+            tempColor.lerpColors(colorMountainGrass, colorMountainRock, smoothstep(18.0, snowStart, h));
         } else {
             tempColor.lerpColors(colorMountainRock, colorSnow, smoothstep(snowStart, snowFull, h));
         }

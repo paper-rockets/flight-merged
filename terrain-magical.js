@@ -11,12 +11,22 @@ export default {
     name: "✨ Magical Sanctuary",
     shoreName: "░ Magical Shore",
     getHeight(x, z, snoise) {
-        // Surreal rolling plateaus with pillars
-        const n1 = snoise(x * 0.0015, z * 0.0015);
-        const n2 = snoise(x * 0.008, z * 0.008);
-        const pillars = Math.max(0, Math.sin(x * 0.004) * Math.cos(z * 0.004));
-        const h = n1 * 45.0 + n2 * 10.0 + (pillars * pillars) * 80.0 + 10.0;
-        return Math.max(6.0, h);
+        // Multi-scale surreal plateaus and gentle floating rock towers
+        const wx = x + snoise(x * 0.0008 + 55.0, z * 0.0008 + 55.0) * 380.0;
+        const wz = z + snoise(x * 0.0008 - 77.0, z * 0.0008 + 77.0) * 380.0;
+
+        const n1 = snoise(wx * 0.0007, wz * 0.0007);
+        const n2 = snoise(wx * 0.002 + 80.0, wz * 0.002 - 80.0);
+        const n3 = snoise(x * 0.006 + 150.0, z * 0.006 + 150.0);
+
+        const plateau = Math.pow(Math.max(0, n1 * 0.65 + n2 * 0.35 + 0.35), 1.6) * 75.0;
+        const detail = n3 * 12.0;
+
+        // Magical geological pillars
+        const pillarN = snoise(wx * 0.005 + 400.0, wz * 0.005 - 400.0);
+        const pillars = Math.pow(Math.max(0, pillarN - 0.55) / 0.45, 2.0) * 60.0;
+
+        return Math.max(3.0, plateau + detail + pillars + 12.0);
     },
     getColor(h, x, z, snoise, tempColor, smoothstep) {
         if (h < 1.0) {

@@ -22,5 +22,19 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "include": [
+    "src",
+    "vite.config.ts",
+    "terrain-*.js",
+    "TerrainEditor.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "*.cjs",
+    "apply_changes.js",
+    "temp.js",
+    "test_noise.js"
+  ]
 }
